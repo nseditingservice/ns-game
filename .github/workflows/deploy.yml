@@ -5,6 +5,9 @@ on:
   push:
     branches: [main]
   workflow_dispatch:
+  # Rebuild every day (00:17 UTC = 05:47 India) to fetch a fresh quote of the day.
+  schedule:
+    - cron: "17 0 * * *"
 
 permissions:
   contents: read
@@ -26,6 +29,9 @@ jobs:
           cache: npm
       - run: npm ci
       - run: npm run build
+      - name: Fetch quote of the day
+        run: node scripts/fetch-quote.mjs dist/quote.json
+        continue-on-error: true
       - uses: actions/configure-pages@v5
       - uses: actions/upload-pages-artifact@v3
         with:
