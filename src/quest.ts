@@ -4,7 +4,7 @@ import type { Area, Data, Goal, GoalLog, Milestone, Task } from "./types";
 import { uid } from "./store";
 
 export const ZONES = ["The Village", "Whispering Forest", "Mountain Pass", "Iron Fortress", "Shadow Gate", "Sky Bridge", "Ember Wastes", "Crystal Caves"];
-export const HEROES = ["🧙", "🥷", "🦸", "🧝", "🤺", "🧑‍🚀", "🐺", "🦅"];
+export const HEROES = ["🧙", "🦁", "🦸", "🧝", "🤺", "🧛", "🐺", "🦅"];
 export const BOSSES = ["🐉", "👹", "🏰", "👑", "💎", "🗿", "🌋", "🏆"];
 // Money is always US dollars. (Other symbols are still recognised so they'd format sensibly.)
 export const MONEY = "$";

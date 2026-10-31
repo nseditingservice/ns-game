@@ -8,7 +8,7 @@ import { celebrate, Empty } from "../ui";
 const PROMPTS: { key: "learned" | "grateful" | "thoughts"; label: string; hint: string }[] = [
   { key: "learned", label: "🧠 What did I learn today?", hint: "An idea, a lesson, a mistake that taught you something…" },
   { key: "grateful", label: "🙏 What am I grateful for?", hint: "People, moments, small things…" },
-  { key: "thoughts", label: "🪶 Thoughts & reflections", hint: "Free writing. What's on your mind? What would the wise version of you say?" },
+  { key: "thoughts", label: "🖋️ Thoughts & reflections", hint: "Free writing. What's on your mind? What would the wise version of you say?" },
 ];
 
 export default function JournalPage() {
@@ -26,7 +26,7 @@ export default function JournalPage() {
   const set = (patch: Partial<Journal>) => {
     const wasEmpty = !(j.learned || j.grateful || j.thoughts);
     put("journal", { ...j, ...patch });
-    if (wasEmpty) celebrate("Journal entry +10 XP", "🪶");
+    if (wasEmpty) celebrate("Journal entry +10 XP", "🖋️");
   };
 
   const q = query.trim().toLowerCase();
@@ -90,7 +90,7 @@ export default function JournalPage() {
             <div className="muted tiny">{fmtDay(x.date, { weekday: "short", day: "numeric", month: "short", year: "numeric" })}</div>
             {x.learned && <div>🧠 {x.learned}</div>}
             {x.grateful && <div>🙏 {x.grateful}</div>}
-            {x.thoughts && <div className="muted small">🪶 {x.thoughts.length > 220 ? `${x.thoughts.slice(0, 220)}…` : x.thoughts}</div>}
+            {x.thoughts && <div className="muted small">🖋️ {x.thoughts.length > 220 ? `${x.thoughts.slice(0, 220)}…` : x.thoughts}</div>}
           </div>
         ))}
       </section>

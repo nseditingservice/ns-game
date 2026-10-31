@@ -28,7 +28,7 @@ export const NAV: { id: Page; label: string; icon: string; mobile?: boolean }[] 
   { id: "goals", label: "Quests", icon: "🗺️" },
   { id: "atlas", label: "Mind Atlas", icon: "🌌" },
   { id: "focus", label: "Focus", icon: "⏱️" },
-  { id: "journal", label: "Journal", icon: "🪶" },
+  { id: "journal", label: "Journal", icon: "🖋️" },
   { id: "review", label: "Review", icon: "📝" },
   { id: "trophies", label: "Trophies", icon: "🏆" },
   { id: "settings", label: "Settings", icon: "⚙️" },

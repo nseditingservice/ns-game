@@ -78,7 +78,7 @@ export default function Atlas() {
             {prompt.a.emoji} {prompt.text} {prompt.b.emoji}
           </p>
           <button className="btn small" onClick={() => { setPrefill({ text: "", domainIds: [prompt.a.id, prompt.b.id] }); setTab("ideas"); }}>
-            🪶 Capture an idea
+            🖋️ Capture an idea
           </button>
         </section>
       )}
@@ -94,7 +94,7 @@ export default function Atlas() {
         {(
           [
             ["constellation", "🌌 Domains"],
-            ["ideas", "🪶 Commonplace Book"],
+            ["ideas", "🖋️ Commonplace Book"],
             ["problems", "❓ 12 Problems"],
             ["library", "📚 Library"],
           ] as [Tab, string][]
@@ -238,7 +238,7 @@ function Constellation({ domains, entries, ideas }: { domains: Domain[]; entries
                 </div>
                 <div className="muted tiny">{s.tier.next ? `${fmtHours(s.tier.next.at * 60 - s.mins)} to ${s.tier.next.name}` : "Grandmaster 🌟"}</div>
                 <div className="muted tiny">
-                  🪶 {s.ideas} ideas · ❓ {s.problems} open problems
+                  🖋️ {s.ideas} ideas · ❓ {s.problems} open problems
                 </div>
               </button>
             ))}
@@ -343,7 +343,7 @@ function IdeasTab({ domains, prefill, onPrefillUsed }: { domains: Domain[]; pref
   const add = () => {
     if (!text.trim()) return;
     put("ideas", { id: uid(), date: todayStr(), text: text.trim(), source: source.trim(), domainIds: sel, links: [] });
-    celebrate(sel.length >= 2 ? "Cross-pollination! +10 XP" : "Idea captured +5 XP", "🪶");
+    celebrate(sel.length >= 2 ? "Cross-pollination! +10 XP" : "Idea captured +5 XP", "🖋️");
     setText("");
     setSource("");
   };
@@ -354,7 +354,7 @@ function IdeasTab({ domains, prefill, onPrefillUsed }: { domains: Domain[]; pref
   return (
     <>
       <section className="card form">
-        <h2>🪶 Capture</h2>
+        <h2>🖋️ Capture</h2>
         <textarea rows={3} placeholder="An idea, a quote, an observation, a question… anything worth keeping." value={text} onChange={(e) => setText(e.target.value)} />
         <input placeholder="Source (book, person, video, shower thought…)" value={source} onChange={(e) => setSource(e.target.value)} />
         <DomainPick domains={domains} value={sel} onChange={setSel} />

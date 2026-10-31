@@ -416,7 +416,7 @@ export default function Today({ go }: { go: Go }) {
       <div className="grid-2">
         <section className="card">
           <div className="card-head">
-            <h2>🪶 What did I learn today?</h2>
+            <h2>🖋️ What did I learn today?</h2>
             <button className="btn ghost small" onClick={() => go("journal")}>
               Journal →
             </button>
