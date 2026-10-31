@@ -1,5 +1,9 @@
-// Optional: paste your Firebase web config here before deploying so every
-// device syncs without having to paste it in Settings. See SETUP.md.
-// Example:
-// export const BUILT_IN_FIREBASE_CONFIG = { apiKey: "…", authDomain: "…", projectId: "…", appId: "…" };
-export const BUILT_IN_FIREBASE_CONFIG: Record<string, string> | null = null;
+// Firebase web config for NS Game (safe to be public; data is protected by Firestore rules).
+export const BUILT_IN_FIREBASE_CONFIG: Record<string, string> | null = {
+  apiKey: "AIzaSyCiQNmNq7-yets6DwQvWp-uNdp5lDLYCow",
+  authDomain: "ns-game-967d2.firebaseapp.com",
+  projectId: "ns-game-967d2",
+  storageBucket: "ns-game-967d2.firebasestorage.app",
+  messagingSenderId: "740442199203",
+  appId: "1:740442199203:web:5c239c370499482f5f9b16",
+};
