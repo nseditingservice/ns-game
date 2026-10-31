@@ -5,6 +5,16 @@ import { parseConfig, useSync } from "../sync";
 import { BUILT_IN_FIREBASE_CONFIG } from "../config";
 import { XP_RULES } from "../game";
 
+const ACCENTS: [string, string][] = [
+  ["Arcane", "#a78bfa"],
+  ["Cyber", "#22d3ee"],
+  ["Gold", "#fbbf24"],
+  ["Crimson", "#f43f5e"],
+  ["Jade", "#34d399"],
+  ["Ember", "#fb923c"],
+  ["Sakura", "#f472b6"],
+];
+
 export default function SettingsPage() {
   const { prefs, setPrefs, local, setLocal, data, replaceAll } = useStore();
   const tags = useList("tags").filter((t) => !t.archived);
@@ -41,7 +51,8 @@ export default function SettingsPage() {
     try {
       const parsed = JSON.parse(await f.text());
       const d = parsed.data as Data;
-      if (parsed.app !== "ns-game" || !d || !COLS.every((c) => typeof d[c] === "object")) throw new Error("Not an NS Game backup file.");
+      if (parsed.app !== "ns-game" || !d || typeof d.tags !== "object" || typeof d.entries !== "object") throw new Error("Not an NS Game backup file.");
+      for (const c of COLS) if (typeof d[c] !== "object") (d as unknown as Record<string, object>)[c] = {};
       if (confirm("Replace ALL current data with this backup?")) replaceAll(d);
     } catch (e) {
       alert(`Import failed: ${(e as Error).message}`);
@@ -77,7 +88,21 @@ export default function SettingsPage() {
           </label>
         </div>
         <label>
-          Workouts appear in Things I Did as
+          Daily water goal (litres)
+          <input type="number" min={0.5} step={0.25} value={prefs.waterGoalL ?? 3} onChange={(e) => setPrefs({ waterGoalL: Number(e.target.value) || 3 })} />
+        </label>
+        <div>
+          <div className="muted small">Accent colour</div>
+          <div className="row wrap accent-pick">
+            {ACCENTS.map(([name, color]) => (
+              <button key={color} className={`accent-dot ${(prefs.accent ?? "#a78bfa") === color ? "on" : ""}`} style={{ background: color }} title={name} onClick={() => setPrefs({ accent: color })}>
+                <span>{name}</span>
+              </button>
+            ))}
+          </div>
+        </div>
+        <label>
+          Default tag for workouts in Things I Did
           <select value={prefs.workoutTagId ?? ""} onChange={(e) => setPrefs({ workoutTagId: e.target.value || null })}>
             <option value="">— don't log workouts as time —</option>
             {tags.map((t) => (

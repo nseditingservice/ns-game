@@ -2,9 +2,10 @@ import { useEffect, useRef, useState, type DragEvent, type PointerEvent as RPoin
 import { uid, useList, useMap, useStore } from "../store";
 import type { Go } from "../App";
 import type { Entry, Plan, Tag } from "../types";
-import { addDays, fmtDay, fmtHours, fmtTime, nowMins, parseTime, todayStr, weekStart } from "../dates";
+import { addDays, fmtDay, fmtHours, fmtTime, nowMins, todayStr, weekStart } from "../dates";
 import { planWeek } from "../ai";
 import { celebrate, Modal, useTimerActions } from "../ui";
+import { EntryEditor, ProjectInput, TimeFields } from "../components/EntryEditor";
 
 const HOUR_PX = 44;
 const SNAP = 15;
@@ -73,23 +74,24 @@ export default function Calendar({ go }: { go: Go }) {
   const [msg, setMsg] = useState<{ kind: "ok" | "err"; text: string } | null>(null);
   const [showAi, setShowAi] = useState(false);
   const [prefsText, setPrefsText] = useState("");
+  const [project, setProject] = useState("");
   const grab = useRef(0);
   const bodyRef = useRef<HTMLDivElement>(null);
   const { dayStart, dayEnd } = prefs;
 
   useEffect(() => setView(mobile ? "day" : "week"), [mobile]);
   useEffect(() => {
-    // Scroll to "now" on open.
+    // The calendar covers the full 24h; open it scrolled to ~2h before now.
     const el = bodyRef.current?.parentElement;
-    if (el) el.scrollTop = Math.max(0, ((nowMins() - dayStart * 60) / 60 - 2) * HOUR_PX);
-  }, [dayStart]);
+    if (el) el.scrollTop = Math.max(0, (nowMins() / 60 - 2) * HOUR_PX);
+  }, []);
 
   const week = weekStart(anchor);
   const days = view === "week" ? Array.from({ length: 7 }, (_, i) => addDays(week, i)) : [anchor];
   const first = days[0];
   const last = days[days.length - 1];
   const today = todayStr();
-  const hours = Array.from({ length: dayEnd - dayStart }, (_, i) => dayStart + i);
+  const hours = Array.from({ length: 24 }, (_, i) => i);
   const visEntries = entries.filter((e) => e.date >= first && e.date <= last);
   const visPlans = plans.filter((p) => p.date >= first && p.date <= last);
   const loggedMins = visEntries.reduce((n, e) => n + e.end - e.start, 0);
@@ -98,11 +100,11 @@ export default function Calendar({ go }: { go: Go }) {
 
   const yToMins = (clientY: number, el: Element, offset = 0) => {
     const r = el.getBoundingClientRect();
-    const raw = ((clientY - r.top - offset) / HOUR_PX) * 60 + dayStart * 60;
-    return Math.min(Math.max(Math.round(raw / SNAP) * SNAP, dayStart * 60), dayEnd * 60 - SNAP);
+    const raw = ((clientY - r.top - offset) / HOUR_PX) * 60;
+    return Math.min(Math.max(Math.round(raw / SNAP) * SNAP, 0), 24 * 60 - SNAP);
   };
 
-  const newEntry = (tag: Tag, date: string, start: number, len = dur): Entry => ({ id: uid(), u: 0, tagId: tag.id, date, start, end: Math.min(start + len, 24 * 60), note: "", taskId: null, source: "manual" });
+  const newEntry = (tag: Tag, date: string, start: number, len = dur): Entry => ({ id: uid(), u: 0, tagId: tag.id, date, start, end: Math.min(start + len, 24 * 60), note: "", taskId: null, source: "manual", project: project.trim() || undefined });
 
   const onDrop = (e: DragEvent<HTMLDivElement>, date: string) => {
     e.preventDefault();
@@ -118,13 +120,13 @@ export default function Calendar({ go }: { go: Go }) {
       const t = tasks.find((x) => x.id === id);
       if (!t) return;
       const start = yToMins(e.clientY, el);
-      put("plans", { id: uid(), date, start, end: Math.min(start + t.estimateMins, dayEnd * 60), title: t.title, taskId: t.id, goalId: t.goalId, tagId: null, source: "manual" });
+      put("plans", { id: uid(), date, start, end: Math.min(start + t.estimateMins, 24 * 60), title: t.title, taskId: t.id, goalId: t.goalId, tagId: null, source: "manual" });
     } else if (kind === "entry" || kind === "plan") {
       const col = kind === "entry" ? "entries" : "plans";
       const item = (kind === "entry" ? entries : plans).find((x) => x.id === id);
       if (!item) return;
       const len = item.end - item.start;
-      const start = Math.min(yToMins(e.clientY, el, grab.current), dayEnd * 60 - len);
+      const start = Math.min(yToMins(e.clientY, el, grab.current), 24 * 60 - len);
       put(col, { ...item, date, start, end: start + len } as never);
     }
   };
@@ -139,7 +141,7 @@ export default function Calendar({ go }: { go: Go }) {
     }
     const past = date < today || (date === today && start < nm);
     if (past && tags[0]) setSel({ kind: "entry", isNew: true, item: newEntry(tags[0], date, start) });
-    else setSel({ kind: "plan", isNew: true, item: { id: uid(), u: 0, date, start, end: Math.min(start + 60, dayEnd * 60), title: "", taskId: null, goalId: null, tagId: null, source: "manual" } });
+    else setSel({ kind: "plan", isNew: true, item: { id: uid(), u: 0, date, start, end: Math.min(start + 60, 24 * 60), title: "", taskId: null, goalId: null, tagId: null, source: "manual" } });
   };
 
   const startResize = (e: RPointerEvent, kind: "entry" | "plan", item: Entry | Plan) => {
@@ -174,7 +176,7 @@ export default function Calendar({ go }: { go: Go }) {
   };
 
   const step = view === "week" ? 7 : 1;
-  const blockStyle = (s: number, en: number) => ({ top: ((s - dayStart * 60) / 60) * HOUR_PX, height: Math.max(((en - s) / 60) * HOUR_PX - 2, 16) });
+  const blockStyle = (s: number, en: number) => ({ top: (s / 60) * HOUR_PX, height: Math.max(((en - s) / 60) * HOUR_PX - 2, 16) });
 
   return (
     <div className="page wide">
@@ -182,7 +184,7 @@ export default function Calendar({ go }: { go: Go }) {
         <div>
           <h1>{view === "week" ? `Week of ${fmtDay(week, { day: "numeric", month: "long" })}` : fmtDay(anchor, { weekday: "long", day: "numeric", month: "long" })}</h1>
           <p className="muted small">
-            {fmtHours(loggedMins)} logged · left lane = <b>plan</b>, right lane = <b>did</b>. {mobile ? "Tap a tag, then tap the calendar." : "Drag tags or tasks onto the calendar."}
+            {fmtHours(loggedMins)} logged<span className="hide-mobile"> · left lane = <b>plan</b>, right lane = <b>did</b>. Drag tags or tasks onto the calendar.</span>
           </p>
         </div>
         <div className="row wrap">
@@ -235,6 +237,13 @@ export default function Calendar({ go }: { go: Go }) {
               + Manage tags
             </button>
           </div>
+          {(!mobile || armed) && (
+            <label className="small muted">
+              Project for new logs (optional)
+              <ProjectInput value={project} onChange={setProject} tagId={armed?.id} />
+            </label>
+          )}
+          {mobile && !armed && <p className="muted tiny">Tap a tag, then tap the calendar to log it. Tap empty space to plan.</p>}
           {!mobile && weekTasks.length > 0 && (
             <>
               <h3>Tasks to plan</h3>
@@ -272,7 +281,7 @@ export default function Calendar({ go }: { go: Go }) {
         <div className="calendar card">
           {armed && (
             <div className="armed-banner" style={{ background: armed.color }}>
-              Tap the calendar to log {armed.emoji} {armed.name} ({fmtHours(dur)})
+              Tap the calendar to log {armed.emoji} {armed.name}{project.trim() ? ` · ${project.trim()}` : ""} ({fmtHours(dur)})
               <button onClick={() => setArmed(null)}>Done</button>
             </div>
           )}
@@ -303,7 +312,9 @@ export default function Calendar({ go }: { go: Go }) {
               {days.map((d) => (
                 <div key={d} className={`cal-col ${d === today ? "today" : ""} ${armed ? "armed" : ""}`} style={{ backgroundSize: `100% ${HOUR_PX}px` }} onDragOver={(e) => e.preventDefault()} onDrop={(e) => onDrop(e, d)} onClick={(e) => onColumnClick(e, d)}>
                   <div className="lane-divider" />
-                  {d === today && nm >= dayStart * 60 && nm <= dayEnd * 60 && <div className="now-line" style={{ top: ((nm - dayStart * 60) / 60) * HOUR_PX }} />}
+                  {d === today && <div className="now-line" style={{ top: (nm / 60) * HOUR_PX }} />}
+                  {view === "day" && <div className="off-hours" style={{ top: 0, height: dayStart * HOUR_PX }} />}
+                  {view === "day" && <div className="off-hours" style={{ top: dayEnd * HOUR_PX, height: (24 - dayEnd) * HOUR_PX }} />}
                   {(() => {
                     const dayPlans = visPlans.filter((p) => p.date === d);
                     const lay = layoutLane(dayPlans);
@@ -332,6 +343,7 @@ export default function Calendar({ go }: { go: Go }) {
                           <div className="cal-block-title">
                             {t?.emoji} {t?.name ?? "?"}
                           </div>
+                          {x.project && <div className="cal-block-time">{x.project}</div>}
                           <div className="cal-block-time">
                             {fmtTime(x.start)}–{fmtTime(x.end)}
                             {x.note ? ` · ${x.note}` : ""}
@@ -348,60 +360,9 @@ export default function Calendar({ go }: { go: Go }) {
         </div>
       </div>
 
-      {sel?.kind === "entry" && <EntryEditor sel={sel.item} isNew={sel.isNew} onClose={() => setSel(null)} />}
+      {sel?.kind === "entry" && <EntryEditor entry={sel.item} isNew={sel.isNew} onClose={() => setSel(null)} />}
       {sel?.kind === "plan" && <PlanEditor sel={sel.item} isNew={sel.isNew} onClose={() => setSel(null)} go={go} />}
     </div>
-  );
-}
-
-function TimeFields({ date, start, end, onChange }: { date: string; start: number; end: number; onChange: (p: { date?: string; start?: number; end?: number }) => void }) {
-  return (
-    <div className="row wrap">
-      <label className="grow">
-        Date
-        <input type="date" value={date} onChange={(e) => e.target.value && onChange({ date: e.target.value })} />
-      </label>
-      <label>
-        From
-        <input type="time" step={300} value={fmtTime(start)} onChange={(e) => e.target.value && onChange({ start: parseTime(e.target.value) })} />
-      </label>
-      <label>
-        To
-        <input type="time" step={300} value={fmtTime(Math.min(end, 23 * 60 + 59))} onChange={(e) => e.target.value && onChange({ end: parseTime(e.target.value) })} />
-      </label>
-    </div>
-  );
-}
-
-function EntryEditor({ sel, isNew, onClose }: { sel: Entry; isNew: boolean; onClose: () => void }) {
-  const { put, del } = useStore();
-  const tags = useList("tags").filter((t) => !t.archived || t.id === sel.tagId);
-  const [e, setE] = useState(sel);
-  return (
-    <Modal title={isNew ? "Log what I did" : "Edit log"} onClose={onClose}>
-      <div className="tag-pick">
-        {tags.map((t) => (
-          <button key={t.id} className={`tag-chip ${e.tagId === t.id ? "armed" : ""}`} style={{ borderLeftColor: t.color }} onClick={() => setE({ ...e, tagId: t.id })}>
-            {t.emoji} {t.name}
-          </button>
-        ))}
-      </div>
-      <TimeFields date={e.date} start={e.start} end={e.end} onChange={(p) => setE({ ...e, ...p })} />
-      <label>
-        Note (optional)
-        <input value={e.note} onChange={(ev) => setE({ ...e, note: ev.target.value })} placeholder="What exactly?" />
-      </label>
-      <div className="row between">
-        <button className="btn primary" disabled={e.end <= e.start} onClick={() => { put("entries", e); onClose(); }}>
-          Save
-        </button>
-        {!isNew && (
-          <button className="btn ghost danger" onClick={() => { del("entries", e.id); onClose(); }}>
-            Delete
-          </button>
-        )}
-      </div>
-    </Modal>
   );
 }
 

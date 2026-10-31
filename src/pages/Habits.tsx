@@ -5,6 +5,7 @@ import { addDays, dateRange, fmtDay, todayStr, weekStart } from "../dates";
 import { autoProgress, bestStreak, habitStatus, habitStreak, isScheduled, useIndex, type Index } from "../game";
 import { useHabitToggle } from "../habitActions";
 import { Modal } from "../ui";
+import { waterTargetL } from "../water";
 
 const DAY_NAMES = ["M", "T", "W", "T", "F", "S", "S"];
 
@@ -23,7 +24,7 @@ const linkLabel = (l: HabitLink, tagName: (id: string) => string) => {
     case "healthyMeals":
       return `Auto: ${l.min}+ healthy meals`;
     case "water":
-      return `Auto: ${l.min}+ glasses of water`;
+      return `Auto: ${waterTargetL(l)}+ L of water`;
     case "sleep":
       return `Auto: ${l.minHours}+ hours sleep`;
     case "weight":
@@ -34,7 +35,7 @@ const linkLabel = (l: HabitLink, tagName: (id: string) => string) => {
 type Template = Omit<Habit, "id" | "u" | "createdAt" | "archived">;
 const EVERY = [0, 1, 2, 3, 4, 5, 6];
 const TEMPLATES: Template[] = [
-  { name: "Drink water", emoji: "💧", identity: "I take care of my body", anchor: "After I wake up, I drink a glass", tiny: "One glass of water", area: "body", days: EVERY, link: { kind: "water", min: 8 } },
+  { name: "Drink water", emoji: "💧", identity: "I take care of my body", anchor: "After I wake up, I drink a glass", tiny: "One glass of water", area: "body", days: EVERY, link: { kind: "water", min: 10, liters: 2.5 } },
   { name: "Work out", emoji: "🏋️", identity: "I am an athlete", anchor: "After work, I change into gym clothes", tiny: "Put on workout clothes", area: "body", days: [0, 1, 2, 3, 4], link: { kind: "workout" } },
   { name: "Sleep 7+ hours", emoji: "😴", identity: "I protect my sleep", anchor: "At 10:30pm, phone goes on the charger outside the bedroom", tiny: "Phone away at 10:30", area: "body", days: EVERY, link: { kind: "sleep", minHours: 7 } },
   { name: "Eat healthy", emoji: "🥗", identity: "I fuel my body well", anchor: "Before each meal, I add something green", tiny: "One healthy meal", area: "body", days: EVERY, link: { kind: "healthyMeals", min: 2 } },
@@ -316,7 +317,7 @@ function HabitEditor({ habit, onClose }: { habit: Habit; onClose: () => void }) 
                 workout: { kind: "workout" },
                 meals: { kind: "meals", min: 3 },
                 healthyMeals: { kind: "healthyMeals", min: 2 },
-                water: { kind: "water", min: 8 },
+                water: { kind: "water", min: 10, liters: 2.5 },
                 sleep: { kind: "sleep", minHours: 7 },
                 weight: { kind: "weight" },
               };
@@ -329,7 +330,7 @@ function HabitEditor({ habit, onClose }: { habit: Habit; onClose: () => void }) 
             <option value="workout">Auto: a workout logged</option>
             <option value="meals">Auto: number of meals logged</option>
             <option value="healthyMeals">Auto: number of healthy meals</option>
-            <option value="water">Auto: glasses of water</option>
+            <option value="water">Auto: litres of water</option>
             <option value="sleep">Auto: hours of sleep</option>
             <option value="weight">Auto: weight logged</option>
           </select>
@@ -358,7 +359,13 @@ function HabitEditor({ habit, onClose }: { habit: Habit; onClose: () => void }) 
             <input type="number" min={1} value={l.minMins} onChange={(e) => setLink({ ...l, minMins: num(e.target.value, 1) })} />
           </label>
         )}
-        {(l.kind === "meals" || l.kind === "healthyMeals" || l.kind === "water") && (
+        {l.kind === "water" && (
+          <label>
+            Litres (at least)
+            <input type="number" min={0.25} step={0.25} value={waterTargetL(l)} onChange={(e) => setLink({ ...l, liters: num(e.target.value, 2.5) })} />
+          </label>
+        )}
+        {(l.kind === "meals" || l.kind === "healthyMeals") && (
           <label>
             At least
             <input type="number" min={1} value={l.min} onChange={(e) => setLink({ ...l, min: num(e.target.value, 1) })} />

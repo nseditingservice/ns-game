@@ -3,7 +3,7 @@ import { PALETTE, uid, useList, useStore } from "../store";
 import { AREAS, AREA_INFO, type Area, type Goal, type Season, type Task } from "../types";
 import { fmtDay, quarterRange, todayStr, weekStart, weeksIn } from "../dates";
 import { breakdownGoal } from "../ai";
-import { celebrate } from "../ui";
+import { celebrate, Modal } from "../ui";
 
 export default function Goals() {
   const { prefs, setPrefs, put, del } = useStore();
@@ -155,6 +155,7 @@ function GoalCard({ goal, season }: { goal: Goal; season: Season }) {
   const [newTitle, setNewTitle] = useState("");
   const [newWeek, setNewWeek] = useState(weeks.includes(thisWeek) ? thisWeek : weeks[0]);
   const [open, setOpen] = useState(true);
+  const [editing, setEditing] = useState(false);
   const done = tasks.filter((t) => t.done).length;
 
   const aiBreakdown = async () => {
@@ -214,6 +215,9 @@ function GoalCard({ goal, season }: { goal: Goal; season: Season }) {
             >
               {goal.done ? "Reopen" : "🏆 Mark achieved"}
             </button>
+            <button className="btn ghost" onClick={() => setEditing(true)}>
+              ✏️ Edit
+            </button>
             <input type="color" value={goal.color} onChange={(e) => put("goals", { ...goal, color: e.target.value })} />
             <button className="btn ghost danger" onClick={() => confirm("Delete this goal and its tasks?") && del("goals", goal.id)}>
               Delete
@@ -264,6 +268,52 @@ function GoalCard({ goal, season }: { goal: Goal; season: Season }) {
           </div>
         </>
       )}
+      {editing && <GoalEditor goal={goal} onClose={() => setEditing(false)} />}
     </section>
+  );
+}
+
+function GoalEditor({ goal, onClose }: { goal: Goal; onClose: () => void }) {
+  const { put } = useStore();
+  const seasons = useList("seasons");
+  const [g, setG] = useState(goal);
+  return (
+    <Modal title="Edit goal" onClose={onClose}>
+      <label>
+        Goal
+        <input value={g.title} onChange={(e) => setG({ ...g, title: e.target.value })} />
+      </label>
+      <label>
+        Why it matters
+        <textarea rows={3} value={g.why} onChange={(e) => setG({ ...g, why: e.target.value })} />
+      </label>
+      <div className="row wrap">
+        <label className="grow">
+          Life area
+          <select value={g.area} onChange={(e) => setG({ ...g, area: e.target.value as Area })}>
+            {AREAS.map((a) => (
+              <option key={a} value={a}>
+                {AREA_INFO[a].emoji} {AREA_INFO[a].label}
+              </option>
+            ))}
+          </select>
+        </label>
+        <label className="grow">
+          Season
+          <select value={g.seasonId} onChange={(e) => setG({ ...g, seasonId: e.target.value })}>
+            {seasons.map((s) => (
+              <option key={s.id} value={s.id}>
+                {s.name}
+              </option>
+            ))}
+          </select>
+        </label>
+      </div>
+      <div>
+        <button className="btn primary" disabled={!g.title.trim()} onClick={() => { put("goals", { ...g, title: g.title.trim() }); onClose(); }}>
+          Save
+        </button>
+      </div>
+    </Modal>
   );
 }

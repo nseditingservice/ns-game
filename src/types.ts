@@ -75,6 +75,8 @@ export interface Entry extends Rec {
   taskId: string | null;
   source: "manual" | "timer" | "focus" | "workout";
   workoutId?: string;
+  /** What exactly: project / client / topic, e.g. "Zen Media House". */
+  project?: string;
 }
 
 export type HabitLink =
@@ -83,7 +85,7 @@ export type HabitLink =
   | { kind: "workout" }
   | { kind: "meals"; min: number }
   | { kind: "healthyMeals"; min: number }
-  | { kind: "water"; min: number }
+  | { kind: "water"; min: number; liters?: number } // liters; old habits used glasses in `min`
   | { kind: "sleep"; minHours: number }
   | { kind: "focus"; minMins: number }
   | { kind: "weight" };
@@ -114,7 +116,9 @@ export interface HealthDay extends Rec {
   sleepHours: number | null;
   sleepQuality: number | null;
   weight: number | null;
+  /** Legacy: glasses of water (250 ml each). New data uses waterMl. */
   water: number;
+  waterMl?: number;
   steps: number | null;
   energy: number | null;
   mood: number | null;
@@ -158,6 +162,14 @@ export interface Review extends Rec {
   coachSuggestions?: string[];
 }
 
+/** Daily journal. id = date */
+export interface Journal extends Rec {
+  date: string;
+  learned: string;
+  grateful: string;
+  thoughts: string;
+}
+
 /** Monthly Wheel of Life self-rating. id = YYYY-MM */
 export interface Wheel extends Rec {
   month: string;
@@ -171,6 +183,15 @@ export interface Prefs extends Rec {
   focusMins: number;
   currentSeasonId: string | null;
   workoutTagId: string | null;
+  /** Workout types shown on the Health page; each can log time to its own tag. */
+  workoutTypes?: WorkoutType[];
+  accent?: string;
+  waterGoalL?: number;
+}
+
+export interface WorkoutType {
+  name: string;
+  tagId: string | null; // null = use the default workout tag
 }
 
 /** A running timer, synced so you can start on PC and stop on phone. */
@@ -180,6 +201,7 @@ export interface Timer extends Rec {
   taskId: string | null;
   label: string;
   plannedMins: number | null; // null = open-ended stopwatch
+  project?: string;
   startedAt: number;
   pausedAt: number | null;
   pausedMs: number;
@@ -199,10 +221,11 @@ export interface Data {
   meals: Record<string, Meal>;
   reviews: Record<string, Review>;
   wheels: Record<string, Wheel>;
+  journal: Record<string, Journal>;
   meta: Record<string, Prefs | Timer>;
 }
 export type Col = keyof Data;
-export const COLS: Col[] = ["seasons", "goals", "tasks", "plans", "tags", "entries", "habits", "habitLogs", "healthDays", "workouts", "meals", "reviews", "wheels", "meta"];
+export const COLS: Col[] = ["seasons", "goals", "tasks", "plans", "tags", "entries", "habits", "habitLogs", "healthDays", "workouts", "meals", "reviews", "wheels", "journal", "meta"];
 export type ItemOf<C extends Col> = Data[C][string];
 
 /** Device-only settings (never synced). */
@@ -213,4 +236,4 @@ export interface Local {
   dirty: string[]; // `${col}/${id}` waiting to upload
 }
 
-export type Page = "today" | "calendar" | "did" | "habits" | "health" | "goals" | "focus" | "review" | "settings" | "more";
+export type Page = "today" | "calendar" | "did" | "habits" | "health" | "goals" | "focus" | "review" | "journal" | "trophies" | "settings" | "more";

@@ -4,6 +4,7 @@ import { AREAS, AREA_INFO, type Area, type Entry, type Tag } from "../types";
 import { addDays, addMonths, dateRange, fmtDay, fmtHours, fmtTime, monthEnd, monthStart, todayStr, weekStart, yearEnd, yearStart } from "../dates";
 import { entryMins } from "../game";
 import { Empty, Modal } from "../ui";
+import { EntryEditor } from "../components/EntryEditor";
 
 type Period = "day" | "week" | "month" | "year" | "all";
 
@@ -50,6 +51,8 @@ export default function Did() {
   const [detail, setDetail] = useState<Tag | null>(null);
   const [editing, setEditing] = useState<Tag | null>(null);
   const [showArchived, setShowArchived] = useState(false);
+  const [query, setQuery] = useState("");
+  const [editEntry, setEditEntry] = useState<Entry | null>(null);
 
   const firstDate = useMemo(() => entries.reduce((m, e) => (e.date < m ? e.date : m), todayStr()), [entries]);
   const [from, to] = range(period, anchor, firstDate);
@@ -120,6 +123,20 @@ export default function Did() {
         </div>
       </header>
 
+      <div className="search-bar">
+        <span>🔍</span>
+        <input type="text" placeholder="Search projects, notes or tags… e.g. Zen Media House" value={query} onChange={(e) => setQuery(e.target.value)} />
+        {query && (
+          <button className="btn ghost small" onClick={() => setQuery("")}>
+            ✕
+          </button>
+        )}
+      </div>
+
+      {query.trim() ? (
+        <SearchResults query={query.trim()} entries={entries} tagMap={tagMap} onEdit={setEditEntry} />
+      ) : (
+        <>
       <div className="grid-3">
         <div className="card stat">
           <div className="stat-num">{fmtHours(total)}</div>
@@ -174,6 +191,32 @@ export default function Did() {
         </section>
       )}
 
+      {(() => {
+        const byProject = new Map<string, number>();
+        for (const e of inRange) if (e.project?.trim()) byProject.set(e.project.trim(), (byProject.get(e.project.trim()) ?? 0) + entryMins(e));
+        const top = [...byProject.entries()].sort((a, b) => b[1] - a[1]).slice(0, 8);
+        if (!top.length) return null;
+        return (
+          <section className="card">
+            <h2>Top projects</h2>
+            {top.map(([p, m]) => (
+              <div key={p} className="did-row" onClick={() => setQuery(p)}>
+                <span className="did-emoji">🗂️</span>
+                <div className="grow">
+                  <div className="row between">
+                    <span>{p}</span>
+                    <b>{fmtHours(m)}</b>
+                  </div>
+                  <div className="bar thin">
+                    <div style={{ width: `${(m / top[0][1]) * 100}%`, background: "var(--accent)" }} />
+                  </div>
+                </div>
+              </div>
+            ))}
+          </section>
+        );
+      })()}
+
       <section className="card">
         <div className="card-head">
           <h2>By tag</h2>
@@ -216,13 +259,17 @@ export default function Did() {
         </ul>
       </section>
 
-      {detail && <TagDetail tag={tagMap.get(detail.id) ?? detail} entries={entries.filter((e) => e.tagId === detail.id)} onClose={() => setDetail(null)} onEdit={() => { setEditing(tagMap.get(detail.id) ?? detail); setDetail(null); }} />}
+        </>
+      )}
+
+      {editEntry && <EntryEditor entry={editEntry} isNew={false} onClose={() => setEditEntry(null)} />}
+      {detail && <TagDetail tag={tagMap.get(detail.id) ?? detail} entries={entries.filter((e) => e.tagId === detail.id)} onEditEntry={setEditEntry} onClose={() => setDetail(null)} onEdit={() => { setEditing(tagMap.get(detail.id) ?? detail); setDetail(null); }} />}
       {editing && <TagEditor tag={editing} onClose={() => setEditing(null)} />}
     </div>
   );
 }
 
-function TagDetail({ tag, entries, onClose, onEdit }: { tag: Tag; entries: Entry[]; onClose: () => void; onEdit: () => void }) {
+function TagDetail({ tag, entries, onClose, onEdit, onEditEntry }: { tag: Tag; entries: Entry[]; onClose: () => void; onEdit: () => void; onEditEntry: (e: Entry) => void }) {
   const today = todayStr();
   const sum = (f: string, t: string) => entries.filter((e) => e.date >= f && e.date <= t).reduce((n, e) => n + entryMins(e), 0);
   const perDay = new Map<string, number>();
@@ -247,7 +294,15 @@ function TagDetail({ tag, entries, onClose, onEdit }: { tag: Tag; entries: Entry
   const heatDays = dateRange(heatStart, addDays(weekStart(today), 6));
   const maxDay = Math.max(30, ...perDay.values());
   const level = (m: number) => (m <= 0 ? 0 : m < maxDay * 0.25 ? 1 : m < maxDay * 0.5 ? 2 : m < maxDay * 0.75 ? 3 : 4);
-  const recent = [...entries].sort((a, b) => (b.date + fmtTime(b.start)).localeCompare(a.date + fmtTime(a.start))).slice(0, 15);
+  const [showAll, setShowAll] = useState(false);
+  const sorted = [...entries].sort((a, b) => (b.date + fmtTime(b.start)).localeCompare(a.date + fmtTime(a.start)));
+  const recent = showAll ? sorted : sorted.slice(0, 15);
+  const byProject = new Map<string, number>();
+  for (const e of entries) {
+    const p = e.project?.trim() || "(no project)";
+    byProject.set(p, (byProject.get(p) ?? 0) + entryMins(e));
+  }
+  const projectRows = [...byProject.entries()].sort((a, b) => b[1] - a[1]);
 
   return (
     <Modal title={`${tag.emoji} ${tag.name}`} onClose={onClose}>
@@ -305,18 +360,29 @@ function TagDetail({ tag, entries, onClose, onEdit }: { tag: Tag; entries: Entry
           <div key={d} className={`heat l${level(perDay.get(d) ?? 0)}`} style={{ ["--c" as string]: tag.color }} title={`${d}: ${fmtHours(perDay.get(d) ?? 0)}`} />
         ))}
       </div>
-      <h3>Recent</h3>
+      {projectRows.length > 1 || (projectRows[0] && projectRows[0][0] !== "(no project)") ? (
+        <>
+          <h3>By project (all time)</h3>
+          {projectRows.map(([p, m]) => (
+            <div key={p} className="row between small">
+              <span className={p === "(no project)" ? "muted" : ""}>{p}</span>
+              <b>{fmtHours(m)}</b>
+            </div>
+          ))}
+        </>
+      ) : null}
+      <h3>{showAll ? `All ${sorted.length} entries` : "Recent"} · tap to edit</h3>
       {!recent.length && <Empty>No entries yet.</Empty>}
       <ul className="list">
         {recent.map((e) => (
-          <li key={e.id} className="row between small">
-            <span>
-              {fmtDay(e.date, { day: "numeric", month: "short" })} {fmtTime(e.start)}–{fmtTime(e.end)} {e.note && <span className="muted">· {e.note}</span>}
-            </span>
-            <b>{fmtHours(entryMins(e))}</b>
-          </li>
+          <EntryRow key={e.id} e={e} onClick={() => onEditEntry(e)} />
         ))}
       </ul>
+      {sorted.length > 15 && (
+        <button className="btn ghost small" onClick={() => setShowAll(!showAll)}>
+          {showAll ? "Show less" : `Show all ${sorted.length}`}
+        </button>
+      )}
       <div>
         <button className="btn" onClick={onEdit}>
           Edit tag
@@ -377,5 +443,127 @@ function TagEditor({ tag, onClose }: { tag: Tag; onClose: () => void }) {
         )}
       </div>
     </Modal>
+  );
+}
+
+function EntryRow({ e, onClick, tag }: { e: Entry; onClick: () => void; tag?: Tag }) {
+  return (
+    <li className="entry-row" onClick={onClick}>
+      <span className="muted tiny entry-when">
+        {fmtDay(e.date, { day: "numeric", month: "short", year: "2-digit" })}
+        <br />
+        {fmtTime(e.start)}–{fmtTime(e.end)}
+      </span>
+      <span className="grow">
+        {tag && (
+          <span style={{ color: tag.color }}>
+            {tag.emoji} {tag.name}
+            {e.project || e.note ? " · " : ""}
+          </span>
+        )}
+        {e.project && <b>{e.project}</b>}
+        {e.note && <span className="muted"> {e.project ? "· " : ""}{e.note}</span>}
+      </span>
+      <b>{fmtHours(entryMins(e))}</b>
+    </li>
+  );
+}
+
+function SearchResults({ query, entries, tagMap, onEdit }: { query: string; entries: Entry[]; tagMap: Map<string, Tag>; onEdit: (e: Entry) => void }) {
+  const [showAll, setShowAll] = useState(false);
+  const q = query.toLowerCase();
+  const hits = entries
+    .filter((e) => (e.project ?? "").toLowerCase().includes(q) || e.note.toLowerCase().includes(q) || (tagMap.get(e.tagId)?.name ?? "").toLowerCase().includes(q))
+    .sort((a, b) => (b.date + fmtTime(b.start)).localeCompare(a.date + fmtTime(a.start)));
+  const today = todayStr();
+  const sum = (f: string, t: string) => hits.filter((e) => e.date >= f && e.date <= t).reduce((n, e) => n + entryMins(e), 0);
+  const all = hits.reduce((n, e) => n + entryMins(e), 0);
+  const byTag = sumBy(hits);
+  const byProject = new Map<string, number>();
+  for (const e of hits) {
+    const p = e.project?.trim() || "(no project)";
+    byProject.set(p, (byProject.get(p) ?? 0) + entryMins(e));
+  }
+  const days = new Set(hits.map((e) => e.date));
+  const first = hits[hits.length - 1]?.date;
+  // Monthly chart: last 12 months.
+  const months: string[] = [];
+  for (let m = addMonths(today, -11); m <= today; m = addMonths(m, 1)) months.push(m);
+  const perMonth = months.map((m) => ({ m, mins: sum(monthStart(m), monthEnd(m)) }));
+  const maxM = Math.max(60, ...perMonth.map((x) => x.mins));
+  const shown = showAll ? hits : hits.slice(0, 30);
+
+  if (!hits.length) return <section className="card"><Empty>Nothing found for “{query}”. Search looks in projects, notes and tag names.</Empty></section>;
+  return (
+    <>
+      <section className="card search-summary">
+        <h2>
+          “{query}” · {fmtHours(all)} total
+        </h2>
+        <p className="muted small">
+          {hits.length} {hits.length === 1 ? "entry" : "entries"} on {days.size} {days.size === 1 ? "day" : "days"}{first ? ` · since ${fmtDay(first, { day: "numeric", month: "short", year: "numeric" })}` : ""} · avg {fmtHours(all / Math.max(1, hits.length))} per session
+        </p>
+        <div className="mini-stats">
+          {[
+            ["Today", sum(today, today)],
+            ["This week", sum(weekStart(today), today)],
+            ["This month", sum(monthStart(today), today)],
+            ["This year", sum(yearStart(today), today)],
+            ["All time", all],
+          ].map(([l, m]) => (
+            <div key={l as string}>
+              <b>{fmtHours(m as number)}</b>
+              <span>{l}</span>
+            </div>
+          ))}
+        </div>
+      </section>
+      <div className="grid-2">
+        <section className="card">
+          <h2>Last 12 months</h2>
+          <div className="bars">
+            {perMonth.map(({ m, mins }) => (
+              <div key={m} className="bar-col" title={`${m.slice(0, 7)}: ${fmtHours(mins)}`}>
+                <div className="bar-val">{mins ? fmtHours(mins) : ""}</div>
+                <div className="bar-fill" style={{ height: `${(mins / maxM) * 100}%` }} />
+                <div className="bar-day">{fmtDay(m, { month: "narrow" })}</div>
+              </div>
+            ))}
+          </div>
+        </section>
+        <section className="card">
+          <h2>Breakdown</h2>
+          <h3>By tag</h3>
+          {[...byTag.entries()].sort((a, b) => b[1] - a[1]).map(([t, m]) => (
+            <div key={t} className="row between small">
+              <span>
+                {tagMap.get(t)?.emoji} {tagMap.get(t)?.name}
+              </span>
+              <b>{fmtHours(m)}</b>
+            </div>
+          ))}
+          <h3>By project</h3>
+          {[...byProject.entries()].sort((a, b) => b[1] - a[1]).map(([p, m]) => (
+            <div key={p} className="row between small">
+              <span className={p === "(no project)" ? "muted" : ""}>{p}</span>
+              <b>{fmtHours(m)}</b>
+            </div>
+          ))}
+        </section>
+      </div>
+      <section className="card">
+        <h2>Every entry · tap to edit</h2>
+        <ul className="list">
+          {shown.map((e) => (
+            <EntryRow key={e.id} e={e} tag={tagMap.get(e.tagId)} onClick={() => onEdit(e)} />
+          ))}
+        </ul>
+        {hits.length > 30 && (
+          <button className="btn ghost small" onClick={() => setShowAll(!showAll)}>
+            {showAll ? "Show less" : `Show all ${hits.length}`}
+          </button>
+        )}
+      </section>
+    </>
   );
 }

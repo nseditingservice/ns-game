@@ -4,9 +4,11 @@ import { addDays, fmtDay, fmtHours, fmtTime, todayStr, weekStart } from "../date
 import { elapsedMs, remainingMs, timerDisplay, useNow } from "../focus";
 import { entryMins } from "../game";
 import { celebrate, Empty, useTimerActions } from "../ui";
+import { EntryEditor, ProjectInput } from "../components/EntryEditor";
+import type { Entry } from "../types";
 
 export default function Focus() {
-  const { prefs, timer } = useStore();
+  const { prefs, timer, put } = useStore();
   const tags = useList("tags").filter((t) => !t.archived);
   const tagMap = useMap("tags");
   const tasks = useList("tasks").filter((t) => !t.done && t.week <= weekStart());
@@ -18,10 +20,12 @@ export default function Focus() {
   const [label, setLabel] = useState("");
   const [mins, setMins] = useState(prefs.focusMins);
   const [note, setNote] = useState("");
+  const [project, setProject] = useState("");
+  const [editEntry, setEditEntry] = useState<Entry | null>(null);
 
   const start = () => {
     const t = tasks.find((x) => x.id === taskId);
-    act.start({ label: label.trim() || t?.title || tagMap.get(tagId)?.name || "Focus", tagId, taskId: t?.id ?? null, plannedMins: mins });
+    act.start({ label: label.trim() || t?.title || tagMap.get(tagId)?.name || "Focus", tagId, taskId: t?.id ?? null, plannedMins: mins, project: project.trim() || undefined });
   };
   const finish = (taskDone: boolean) => {
     const m = act.stop({ note: note.trim() || undefined, taskDone });
@@ -65,6 +69,10 @@ export default function Focus() {
             </svg>
             <h2>{timer.label}</h2>
             {timer.tagId && <p style={{ color }}>{tagMap.get(timer.tagId)?.emoji} {tagMap.get(timer.tagId)?.name}</p>}
+            <label className="small muted project-field">
+              Project / client
+              <ProjectInput value={timer.project ?? ""} onChange={(p) => put("meta", { ...timer, project: p })} tagId={timer.tagId ?? undefined} />
+            </label>
             <textarea rows={2} placeholder="Note: what did you get done?" value={note} onChange={(e) => setNote(e.target.value)} />
             <div className="row wrap center">
               <button className="btn" onClick={act.pause}>
@@ -106,6 +114,10 @@ export default function Focus() {
                   </option>
                 ))}
               </select>
+            </label>
+            <label>
+              Project / client (optional)
+              <ProjectInput value={project} onChange={setProject} tagId={tagId} />
             </label>
             {!taskId && (
               <label>
@@ -158,13 +170,14 @@ export default function Focus() {
           </div>
         </section>
         <section className="card">
-          <h2>Recent sessions</h2>
+          <h2>Recent sessions · tap to edit</h2>
           {!recent.length && <Empty>No focus sessions yet.</Empty>}
           <ul className="list">
             {recent.map((e) => (
-              <li key={e.id} className="row between small session-row">
+              <li key={e.id} className="row between small session-row clickable" onClick={() => setEditEntry(e)}>
                 <span>
-                  {tagMap.get(e.tagId)?.emoji} {e.note || tagMap.get(e.tagId)?.name}
+                  {tagMap.get(e.tagId)?.emoji} {e.project ? <b>{e.project} </b> : null}
+                  {e.note || (!e.project && tagMap.get(e.tagId)?.name)}
                 </span>
                 <span className="muted">
                   {fmtHours(entryMins(e))} · {fmtDay(e.date, { day: "numeric", month: "short" })} {fmtTime(e.start)}
@@ -174,6 +187,7 @@ export default function Focus() {
           </ul>
         </section>
       </div>
+      {editEntry && <EntryEditor entry={editEntry} isNew={false} onClose={() => setEditEntry(null)} />}
     </div>
   );
 }

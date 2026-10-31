@@ -99,7 +99,7 @@ export function spanToEntries(startMs: number, endMs: number, base: Omit<Entry, 
 export function useTimerActions() {
   const { put, putMany, timer, data } = useStore();
   return {
-    start: (opts: { label: string; tagId: string | null; taskId?: string | null; plannedMins: number | null }) => put("meta", newTimer(opts)),
+    start: (opts: { label: string; tagId: string | null; taskId?: string | null; plannedMins: number | null; project?: string }) => put("meta", { ...newTimer(opts), project: opts.project }),
     pause: () => {
       if (!timer) return;
       put("meta", timer.pausedAt ? { ...timer, pausedMs: timer.pausedMs + Date.now() - timer.pausedAt, pausedAt: null } : { ...timer, pausedAt: Date.now() });
@@ -114,7 +114,7 @@ export function useTimerActions() {
       if (mins >= 1 && tagId) {
         const endMs = Date.now();
         // Log as a contiguous block ending now (pauses are excluded).
-        putMany("entries", spanToEntries(endMs - mins * 60000, endMs, { tagId, note: opts.note ?? (timer.label !== data.tags[tagId]?.name ? timer.label : ""), taskId: timer.taskId, source: timer.plannedMins ? "focus" : "timer" }));
+        putMany("entries", spanToEntries(endMs - mins * 60000, endMs, { tagId, note: opts.note ?? (timer.label !== data.tags[tagId]?.name ? timer.label : ""), taskId: timer.taskId, source: timer.plannedMins ? "focus" : "timer", project: timer.project?.trim() || undefined }));
       }
       if (opts.taskDone && timer.taskId) {
         const t = data.tasks[timer.taskId];

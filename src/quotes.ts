@@ -1,0 +1,51 @@
+// Daily wisdom. One quote per day, chosen by date.
+export const QUOTES: [string, string][] = [
+  ["How we spend our days is, of course, how we spend our lives.", "Annie Dillard"],
+  ["Waste no more time arguing about what a good man should be. Be one.", "Marcus Aurelius"],
+  ["The impediment to action advances action. What stands in the way becomes the way.", "Marcus Aurelius"],
+  ["Very little is needed to make a happy life; it is all within yourself, in your way of thinking.", "Marcus Aurelius"],
+  ["It is not that we have a short time to live, but that we waste a lot of it.", "Seneca"],
+  ["We suffer more often in imagination than in reality.", "Seneca"],
+  ["While we are postponing, life speeds by.", "Seneca"],
+  ["No man is free who is not master of himself.", "Epictetus"],
+  ["First say to yourself what you would be; and then do what you have to do.", "Epictetus"],
+  ["We are what we repeatedly do. Excellence, then, is not an act, but a habit.", "Will Durant, on Aristotle"],
+  ["The unexamined life is not worth living.", "Socrates"],
+  ["The journey of a thousand miles begins with one step.", "Lao Tzu"],
+  ["Nature does not hurry, yet everything is accomplished.", "Lao Tzu"],
+  ["It does not matter how slowly you go as long as you do not stop.", "Confucius"],
+  ["No man ever steps in the same river twice.", "Heraclitus"],
+  ["He who has a why to live can bear almost any how.", "Friedrich Nietzsche"],
+  ["One must still have chaos in oneself to be able to give birth to a dancing star.", "Friedrich Nietzsche"],
+  ["One must imagine Sisyphus happy.", "Albert Camus"],
+  ["In the midst of winter, I found there was, within me, an invincible summer.", "Albert Camus"],
+  ["Life can only be understood backwards; but it must be lived forwards.", "Søren Kierkegaard"],
+  ["All things excellent are as difficult as they are rare.", "Baruch Spinoza"],
+  ["All of humanity's problems stem from man's inability to sit quietly in a room alone.", "Blaise Pascal"],
+  ["It is not enough to be busy. The question is: what are we busy about?", "Henry David Thoreau"],
+  ["Do not spoil what you have by desiring what you have not.", "Epicurus"],
+  ["When we are no longer able to change a situation, we are challenged to change ourselves.", "Viktor Frankl"],
+  ["Knowing is not enough; we must apply. Willing is not enough; we must do.", "Johann Wolfgang von Goethe"],
+  ["Learning never exhausts the mind.", "Leonardo da Vinci"],
+  ["As a well-spent day brings happy sleep, so a life well spent brings happy death.", "Leonardo da Vinci"],
+  ["Lost time is never found again.", "Benjamin Franklin"],
+  ["I fear not the man who has practiced 10,000 kicks once, but I fear the man who has practiced one kick 10,000 times.", "Bruce Lee"],
+  ["Empty your mind. Be formless, shapeless, like water.", "Bruce Lee"],
+  ["Do nothing that is of no use.", "Miyamoto Musashi"],
+  ["You have a right to your actions, but never to the fruits of your actions.", "Bhagavad Gita 2.47"],
+  ["Arise, awake, and stop not till the goal is reached.", "Swami Vivekananda"],
+  ["Better than a thousand hollow words is one word that brings peace.", "The Dhammapada"],
+  ["The mind is everything. What you think you become.", "attributed to the Buddha"],
+  ["Man is condemned to be free.", "Jean-Paul Sartre"],
+  ["The obstacle is the path.", "Zen proverb"],
+  ["Fall seven times, stand up eight.", "Japanese proverb"],
+  ["He who conquers himself is the mightiest warrior.", "Confucius (attributed)"],
+  ["Discipline is choosing between what you want now and what you want most.", "Augusta F. Kantra (attributed)"],
+  ["The best time to plant a tree was 20 years ago. The second best time is now.", "Proverb"],
+];
+
+export function quoteOfDay(date: string): [string, string] {
+  let h = 0;
+  for (const c of date) h = (h * 31 + c.charCodeAt(0)) >>> 0;
+  return QUOTES[h % QUOTES.length];
+}

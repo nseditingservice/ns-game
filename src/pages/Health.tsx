@@ -1,10 +1,11 @@
 import { useState } from "react";
-import { uid, useList, useStore } from "../store";
-import type { Exercise, HealthDay, Meal, MealQuality, Workout } from "../types";
+import { PALETTE, uid, useList, useStore } from "../store";
+import type { Exercise, HealthDay, Meal, MealQuality, Workout, WorkoutType } from "../types";
 import { addDays, dateRange, fmtDay, fmtTime, nowMins, parseTime, todayStr, weekStart } from "../dates";
 import { celebrate, Empty, Modal, Rating } from "../ui";
+import { fmtL, waterMl } from "../water";
 
-const WORKOUT_TYPES = ["Strength", "Run", "Walk", "Cycle", "HIIT", "Yoga", "Sport", "Swim", "Stretch", "Other"];
+const DEFAULT_WORKOUT_TYPES: WorkoutType[] = ["Muay Thai", "Strength", "Run", "Walk", "Cycle", "HIIT", "Yoga", "Sport", "Swim", "Stretch", "Other"].map((name) => ({ name, tagId: null }));
 const Q: Record<MealQuality, { emoji: string; label: string }> = { great: { emoji: "🟢", label: "Healthy" }, ok: { emoji: "🟡", label: "Okay" }, junk: { emoji: "🔴", label: "Junk" } };
 const MOODS = ["😞", "😕", "😐", "🙂", "😄"];
 
@@ -12,9 +13,10 @@ const blankDay = (date: string): HealthDay => ({ id: date, u: 0, date, sleepHour
 const mealKindFor = (m: number): Meal["kind"] => (m < 10 * 60 + 30 ? "breakfast" : m < 15 * 60 ? "lunch" : m < 17 * 60 + 30 ? "snack" : "dinner");
 
 export default function Health() {
-  const { data, put, del } = useStore();
+  const { data, put, del, prefs } = useStore();
   const [date, setDate] = useState(todayStr());
   const [editingWorkout, setEditingWorkout] = useState<Workout | null>(null);
+  const [editingMeal, setEditingMeal] = useState<Meal | null>(null);
   const meals = useList("meals");
   const workouts = useList("workouts");
   const healthDays = useList("healthDays");
@@ -91,14 +93,17 @@ export default function Health() {
             <input type="number" inputMode="numeric" min={0} value={hd.steps ?? ""} onChange={(e) => setDay({ steps: numOrNull(e.target.value) })} />
           </label>
           <label>
-            💧 Water (glasses)
+            💧 Water (litres)
+            <input type="number" inputMode="decimal" step={0.05} min={0} value={Math.round(waterMl(hd)) / 1000 || ""} placeholder="0" onChange={(e) => setDay({ waterMl: Math.max(0, Math.round(Number(e.target.value || 0) * 1000)) })} />
             <div className="row">
-              <button className="btn" onClick={() => setDay({ water: Math.max(0, hd.water - 1) })}>
-                −
+              <button className="btn small" onClick={() => setDay({ waterMl: Math.max(0, waterMl(hd) - 250) })}>
+                −250
               </button>
-              <b className="count">{hd.water}</b>
-              <button className="btn primary" onClick={() => setDay({ water: hd.water + 1 })}>
-                +
+              <button className="btn small primary" onClick={() => setDay({ waterMl: waterMl(hd) + 250 })}>
+                +250 ml
+              </button>
+              <button className="btn small primary" onClick={() => setDay({ waterMl: waterMl(hd) + 500 })}>
+                +500 ml
               </button>
             </div>
           </label>
@@ -158,7 +163,7 @@ export default function Health() {
         <h2>🍽️ What I ate</h2>
         <ul className="list">
           {dayMeals.map((m) => (
-            <li key={m.id} className="meal-row">
+            <li key={m.id} className="meal-row clickable" onClick={() => setEditingMeal(m)}>
               <span>{Q[m.quality].emoji}</span>
               <span className="time">{fmtTime(m.time)}</span>
               <span className="grow">
@@ -166,7 +171,7 @@ export default function Health() {
                 {m.what}
                 {m.protein ? <span className="muted tiny"> · {m.protein}g protein</span> : null}
               </span>
-              <button className="btn ghost small" onClick={() => del("meals", m.id)}>
+              <button className="btn ghost small" onClick={(e) => { e.stopPropagation(); del("meals", m.id); }}>
                 ✕
               </button>
             </li>
@@ -207,6 +212,20 @@ export default function Health() {
             </div>
           </div>
           <div>
+            <h3>Water (30 days) · goal {prefs.waterGoalL ?? 3} L</h3>
+            <div className="bars small-bars">
+              {last30.map((d) => {
+                const ml = waterMl(hmap.get(d));
+                const goal = (prefs.waterGoalL ?? 3) * 1000;
+                return (
+                  <div key={d} className="bar-col" title={`${d}: ${fmtL(ml)}`}>
+                    <div className="bar-fill" style={{ height: `${Math.min(100, (ml / (goal * 1.3)) * 100)}%`, background: ml >= goal ? "#0ea5e9" : ml ? "#7dd3fc" : "transparent" }} />
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+          <div>
             <h3>Workouts per week</h3>
             <div className="bars small-bars">
               {wPerWeek.map((n, i) => (
@@ -239,6 +258,7 @@ export default function Health() {
       </section>
 
       {editingWorkout && <WorkoutEditor w={editingWorkout} onClose={() => setEditingWorkout(null)} />}
+      {editingMeal && <MealEditor meal={editingMeal} onClose={() => setEditingMeal(null)} />}
     </div>
   );
 }
@@ -273,16 +293,31 @@ function LineChart({ points }: { points: { d: string; v: number }[] }) {
   );
 }
 
+const INSET = { background: "var(--panel-2)", padding: 12 };
+const LINK = { all: "unset", cursor: "pointer", color: "var(--accent)", textDecoration: "underline" } as const;
+
 function WorkoutEditor({ w: initial, onClose }: { w: Workout; onClose: () => void }) {
-  const { put, del, data, prefs } = useStore();
+  const { put, del, data, prefs, setPrefs } = useStore();
+  const tags = useList("tags").filter((t) => !t.archived);
   const [w, setW] = useState(initial);
+  const [adding, setAdding] = useState(false);
+  const [managing, setManaging] = useState(false);
+  const [newName, setNewName] = useState("");
+  const [newTag, setNewTag] = useState("__new");
+  const [newEmoji, setNewEmoji] = useState("🥊");
   const isNew = !data.workouts[w.id] || data.workouts[w.id].del;
+  const types = prefs.workoutTypes ?? DEFAULT_WORKOUT_TYPES;
+  const shown = types.some((t) => t.name === w.type) ? types : [...types, { name: w.type, tagId: null }];
   const setEx = (i: number, patch: Partial<Exercise>) => setW({ ...w, exercises: w.exercises.map((x, j) => (j === i ? { ...x, ...patch } : x)) });
+  const liveTag = (id: string | null | undefined) => (id && data.tags[id] && !data.tags[id].del ? id : null);
+  const defaultTag = liveTag(prefs.workoutTagId);
+  const tagFor = (typeName: string) => liveTag(types.find((t) => t.name === typeName)?.tagId) ?? defaultTag;
+  const tagLabel = (id: string | null) => (id ? `${data.tags[id]?.emoji ?? ""} ${data.tags[id]?.name ?? "?"}` : "no tag");
 
   const save = () => {
     put("workouts", w);
-    // Also show the workout on the calendar / in Things I Did.
-    const tagId = prefs.workoutTagId && data.tags[prefs.workoutTagId] ? prefs.workoutTagId : null;
+    // Also show the workout on the calendar / in Things I Did, under this type's tag.
+    const tagId = tagFor(w.type);
     const existing = Object.values(data.entries).find((e) => e.workoutId === w.id && !e.del);
     if (tagId && w.start != null) {
       put("entries", { id: existing?.id ?? uid(), tagId, date: w.date, start: w.start, end: Math.min(w.start + w.durationMins, 24 * 60), note: w.type, taskId: null, source: "workout", workoutId: w.id });
@@ -291,15 +326,108 @@ function WorkoutEditor({ w: initial, onClose }: { w: Workout; onClose: () => voi
     onClose();
   };
 
+  const addType = () => {
+    const name = newName.trim();
+    if (!name || types.some((t) => t.name.toLowerCase() === name.toLowerCase())) return;
+    let tagId: string | null = newTag === "__default" ? null : newTag;
+    if (newTag === "__new") {
+      tagId = uid();
+      put("tags", { id: tagId, name, emoji: newEmoji || "🏅", color: PALETTE[Object.keys(data.tags).length % PALETTE.length], area: "body", weeklyTargetMins: 0, archived: false });
+    }
+    setPrefs({ workoutTypes: [...types, { name, tagId }] });
+    setW({ ...w, type: name });
+    setAdding(false);
+    setNewName("");
+  };
+
+  const updateType = (i: number, patch: Partial<WorkoutType>) => setPrefs({ workoutTypes: types.map((t, j) => (j === i ? { ...t, ...patch } : t)) });
+  const removeType = (i: number) => setPrefs({ workoutTypes: types.filter((_, j) => j !== i) });
+
   return (
     <Modal title={isNew ? "Log workout" : "Edit workout"} onClose={onClose}>
       <div className="tag-pick">
-        {WORKOUT_TYPES.map((t) => (
-          <button key={t} className={`tag-chip ${w.type === t ? "armed" : ""}`} onClick={() => setW({ ...w, type: t })}>
-            {t}
+        {shown.map((t) => (
+          <button key={t.name} className={`tag-chip ${w.type === t.name ? "armed" : ""}`} onClick={() => setW({ ...w, type: t.name })}>
+            {t.tagId && data.tags[t.tagId] ? `${data.tags[t.tagId].emoji} ` : ""}
+            {t.name}
           </button>
         ))}
+        <button className="tag-chip add" onClick={() => setAdding(!adding)}>
+          + New type
+        </button>
       </div>
+      <div className="muted tiny">
+        Time goes to {tagLabel(tagFor(w.type))} in Things I Did{w.start == null ? " (set a start time to log it)" : ""} ·{" "}
+        <button style={LINK} onClick={() => setManaging(!managing)}>
+          {managing ? "done" : "manage types"}
+        </button>
+      </div>
+
+      {adding && (
+        <div className="card form" style={INSET}>
+          <div className="row wrap">
+            <input className="grow" autoFocus placeholder="e.g. Muay Thai, Boxing, Football" value={newName} onChange={(e) => setNewName(e.target.value)} onKeyDown={(e) => e.key === "Enter" && addType()} />
+          </div>
+          <label>
+            Log its time in Things I Did as
+            <select value={newTag} onChange={(e) => setNewTag(e.target.value)}>
+              <option value="__new">＋ A new tag called “{newName.trim() || "…"}”</option>
+              <option value="__default">The default workout tag ({tagLabel(defaultTag)})</option>
+              {tags.map((t) => (
+                <option key={t.id} value={t.id}>
+                  {t.emoji} {t.name}
+                </option>
+              ))}
+            </select>
+          </label>
+          {newTag === "__new" && (
+            <label className="row">
+              Emoji
+              <input className="emoji-input" value={newEmoji} onChange={(e) => setNewEmoji(e.target.value.slice(0, 4))} />
+            </label>
+          )}
+          <div className="row">
+            <button className="btn primary" disabled={!newName.trim() || types.some((t) => t.name.toLowerCase() === newName.trim().toLowerCase())} onClick={addType}>
+              Add type
+            </button>
+            <button className="btn ghost" onClick={() => setAdding(false)}>
+              Cancel
+            </button>
+          </div>
+        </div>
+      )}
+
+      {managing && (
+        <div className="card" style={INSET}>
+          {types.map((t, i) => (
+            <div key={t.name} className="row" style={{ padding: "4px 0", borderBottom: "1px solid var(--border)" }}>
+              <span className="grow">{t.name}</span>
+              <select
+                style={{ maxWidth: "55%", fontSize: "0.85rem" }}
+                value={t.tagId ?? ""}
+                onChange={(e) => {
+                  if (e.target.value !== "__new") return updateType(i, { tagId: e.target.value || null });
+                  const id = uid();
+                  put("tags", { id, name: t.name, emoji: "🏅", color: PALETTE[Object.keys(data.tags).length % PALETTE.length], area: "body", weeklyTargetMins: 0, archived: false });
+                  updateType(i, { tagId: id });
+                }}
+              >
+                <option value="">Default ({tagLabel(defaultTag)})</option>
+                {!tags.some((tg) => tg.name.toLowerCase() === t.name.toLowerCase()) && <option value="__new">＋ New tag “{t.name}”</option>}
+                {tags.map((tg) => (
+                  <option key={tg.id} value={tg.id}>
+                    {tg.emoji} {tg.name}
+                  </option>
+                ))}
+              </select>
+              <button className="btn ghost small" title="Remove type" onClick={() => removeType(i)}>
+                ✕
+              </button>
+            </div>
+          ))}
+          <p className="muted tiny">Changing a type's tag applies to workouts you save from now on.</p>
+        </div>
+      )}
       <div className="row wrap">
         <label>
           Date
@@ -355,6 +483,58 @@ function WorkoutEditor({ w: initial, onClose }: { w: Workout; onClose: () => voi
             Delete
           </button>
         )}
+      </div>
+    </Modal>
+  );
+}
+
+function MealEditor({ meal, onClose }: { meal: Meal; onClose: () => void }) {
+  const { put, del } = useStore();
+  const [m, setM] = useState(meal);
+  return (
+    <Modal title="Edit meal" onClose={onClose}>
+      <label>
+        What did you eat?
+        <input value={m.what} onChange={(e) => setM({ ...m, what: e.target.value })} />
+      </label>
+      <div className="row wrap">
+        {(Object.keys(Q) as MealQuality[]).map((q) => (
+          <button key={q} className={`btn small ${m.quality === q ? "primary" : ""}`} onClick={() => setM({ ...m, quality: q })}>
+            {Q[q].emoji} {Q[q].label}
+          </button>
+        ))}
+      </div>
+      <div className="row wrap">
+        <label>
+          Meal
+          <select value={m.kind} onChange={(e) => setM({ ...m, kind: e.target.value as Meal["kind"] })}>
+            {["breakfast", "lunch", "snack", "dinner"].map((k) => (
+              <option key={k} value={k}>
+                {k}
+              </option>
+            ))}
+          </select>
+        </label>
+        <label>
+          Date
+          <input type="date" value={m.date} onChange={(e) => e.target.value && setM({ ...m, date: e.target.value })} />
+        </label>
+        <label>
+          Time
+          <input type="time" value={fmtTime(m.time)} onChange={(e) => e.target.value && setM({ ...m, time: parseTime(e.target.value) })} />
+        </label>
+        <label>
+          Protein (g)
+          <input type="number" inputMode="numeric" value={m.protein ?? ""} onChange={(e) => setM({ ...m, protein: e.target.value ? Number(e.target.value) : null })} style={{ width: 100 }} />
+        </label>
+      </div>
+      <div className="row between">
+        <button className="btn primary" disabled={!m.what.trim()} onClick={() => { put("meals", { ...m, what: m.what.trim() }); onClose(); }}>
+          Save
+        </button>
+        <button className="btn ghost danger" onClick={() => { del("meals", m.id); onClose(); }}>
+          Delete
+        </button>
       </div>
     </Modal>
   );

@@ -3,7 +3,10 @@ import { useStore } from "./store";
 import type { Page } from "./types";
 import { chime, remainingMs, timerDisplay, useNow } from "./focus";
 import { titleFor, useXp } from "./game";
-import { Toasts } from "./ui";
+import { celebrate, Toasts } from "./ui";
+import { useTrophies } from "./achievements";
+import JournalPage from "./pages/Journal";
+import Trophies from "./pages/Trophies";
 import { useSync } from "./sync";
 import Today from "./pages/Today";
 import Calendar from "./pages/Calendar";
@@ -23,7 +26,9 @@ export const NAV: { id: Page; label: string; icon: string; mobile?: boolean }[] 
   { id: "health", label: "Health", icon: "💪", mobile: true },
   { id: "goals", label: "Goals", icon: "🎯" },
   { id: "focus", label: "Focus", icon: "⏱️" },
+  { id: "journal", label: "Journal", icon: "🪶" },
   { id: "review", label: "Review", icon: "📝" },
+  { id: "trophies", label: "Trophies", icon: "🏆" },
   { id: "settings", label: "Settings", icon: "⚙️" },
 ];
 
@@ -31,7 +36,8 @@ export type Go = (p: Page) => void;
 
 export default function App() {
   const [page, setPage] = useState<Page>(() => (location.hash.slice(1) as Page) || "today");
-  const { timer } = useStore();
+  const { timer, prefs } = useStore();
+  const trophies = useTrophies();
   const sync = useSync();
   const xp = useXp();
   const now = useNow();
@@ -42,6 +48,26 @@ export default function App() {
     window.addEventListener("hashchange", onHash);
     return () => window.removeEventListener("hashchange", onHash);
   }, []);
+
+  // Accent colour theme.
+  useEffect(() => {
+    document.documentElement.style.setProperty("--accent", prefs.accent ?? "#a78bfa");
+  }, [prefs.accent]);
+
+  // Announce newly unlocked trophies (remembered per device).
+  useEffect(() => {
+    const done = trophies.filter((t) => t.value >= t.target).map((t) => t.id);
+    const raw = localStorage.getItem("nsgame:trophies");
+    if (raw == null) {
+      localStorage.setItem("nsgame:trophies", JSON.stringify(done));
+      return;
+    }
+    const seen = new Set<string>(JSON.parse(raw));
+    const fresh = trophies.filter((t) => t.value >= t.target && !seen.has(t.id));
+    if (!fresh.length) return;
+    fresh.forEach((t, i) => setTimeout(() => celebrate(`Trophy unlocked: ${t.name}`, t.emoji), 600 * i));
+    localStorage.setItem("nsgame:trophies", JSON.stringify([...seen, ...fresh.map((t) => t.id)]));
+  }, [trophies]);
 
   const go: Go = (p) => {
     location.hash = p;
@@ -128,6 +154,8 @@ export default function App() {
         {page === "goals" && <Goals />}
         {page === "focus" && <Focus />}
         {page === "review" && <ReviewPage />}
+        {page === "journal" && <JournalPage />}
+        {page === "trophies" && <Trophies />}
         {page === "settings" && <SettingsPage />}
         {page === "more" && <More go={go} />}
       </main>
@@ -139,7 +167,7 @@ export default function App() {
             <small>{n.id === "did" ? "I Did" : n.label}</small>
           </button>
         ))}
-        <button className={["goals", "focus", "review", "settings", "more"].includes(page) ? "active" : ""} onClick={() => go("more")}>
+        <button className={["goals", "focus", "journal", "review", "trophies", "settings", "more"].includes(page) ? "active" : ""} onClick={() => go("more")}>
           <span>☰</span>
           <small>More</small>
         </button>
