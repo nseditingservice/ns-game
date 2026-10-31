@@ -95,8 +95,9 @@ Reflection — Wins: ${review.wins || "-"} | Challenges: ${review.challenges || 
   };
 
   // ---- Wheel of Life (monthly self-rating) ----
-  const month = todayStr().slice(0, 7);
-  const lastMonth = addMonths(todayStr(), -1).slice(0, 7);
+  const [wheelAnchor, setWheelAnchor] = useState(todayStr());
+  const month = wheelAnchor.slice(0, 7);
+  const lastMonth = addMonths(wheelAnchor, -1).slice(0, 7);
   const wheel = (data.wheels[month] && !data.wheels[month].del ? data.wheels[month] : null) ?? { id: month, u: 0, month, scores: {} };
   const prevWheel = data.wheels[lastMonth] && !data.wheels[lastMonth].del ? data.wheels[lastMonth] : null;
   const rate = (a: Area, v: number | null) => {
@@ -191,11 +192,21 @@ Reflection — Wins: ${review.wins || "-"} | Challenges: ${review.challenges || 
 
       <div className="grid-2">
         <section className="card">
-          <h2>🎡 Wheel of Life · {fmtDay(`${month}-01`, { month: "long" })}</h2>
+          <div className="row between">
+            <h2>🎡 Wheel of Life · {fmtDay(`${month}-01`, { month: "long", year: "numeric" })}</h2>
+            <span className="row">
+              <button className="btn ghost small" title="Previous month" onClick={() => setWheelAnchor(addMonths(wheelAnchor, -1))}>
+                ←
+              </button>
+              <button className="btn ghost small" title="Next month" disabled={month >= todayStr().slice(0, 7)} onClick={() => setWheelAnchor(addMonths(wheelAnchor, 1))}>
+                →
+              </button>
+            </span>
+          </div>
           <p className="muted small">Once a month, rate how satisfied you feel with each area (1–10). Dashed = last month.</p>
           {Object.keys(wheel.scores).length > 0 && (
-            <button className="btn ghost small" onClick={() => confirm("Clear this month's Wheel of Life rating? (removes its 30 XP)") && put("wheels", { ...wheel, scores: {} })}>
-              Clear this month's rating
+            <button className="btn ghost small" onClick={() => confirm(`Clear the ${fmtDay(`${month}-01`, { month: "long" })} Wheel of Life rating? (removes its 30 XP)`) && put("wheels", { ...wheel, scores: {} })}>
+              Clear {fmtDay(`${month}-01`, { month: "long" })} rating
             </button>
           )}
           <Radar max={10} series={[...(prevWheel ? [{ values: prevWheel.scores, color: "#94a3b8" }] : []), { values: wheel.scores, color: "var(--accent)", fill: true }]} />
