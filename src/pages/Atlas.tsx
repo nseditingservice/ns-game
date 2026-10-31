@@ -140,11 +140,34 @@ function Constellation({ domains, entries, ideas }: { domains: Domain[]; entries
       if (o && i.id < o.id) for (const a of i.domainIds) for (const b of o.domainIds) bump(a, b);
     }
   }
-  const S = 360;
-  const c = S / 2;
-  const R = S / 2 - 62;
+  // Layout: one ring for up to 8 domains, two interleaved rings beyond that,
+  // with labels pushed outward (away from the centre) so they never overlap stars.
+  const W = 680;
+  const H = 600;
+  const cx = W / 2;
+  const cy = H / 2;
+  const n = stats.length;
+  const twoRings = n > 8;
   const maxMins = Math.max(60, ...stats.map((s) => s.mins));
-  const pos = new Map(stats.map((s, i) => [s.d.id, { x: c + Math.cos((i / stats.length) * Math.PI * 2 - Math.PI / 2) * R, y: c + Math.sin((i / stats.length) * Math.PI * 2 - Math.PI / 2) * R }]));
+  const starScale = n > 8 ? 0.75 : n > 5 ? 0.9 : 1;
+  const place = stats.map((s, i) => {
+    const angle = (i / Math.max(n, 1)) * Math.PI * 2 - Math.PI / 2;
+    const R = twoRings ? (i % 2 ? 140 : 215) : n <= 3 ? 150 : 195;
+    const r = (11 + 20 * Math.sqrt(s.mins / maxMins)) * starScale;
+    return { id: s.d.id, angle, r, x: cx + Math.cos(angle) * R, y: cy + Math.sin(angle) * R };
+  });
+  const pos = new Map(place.map((p) => [p.id, p]));
+  const labelFor = (p: (typeof place)[number]) => {
+    const cos = Math.cos(p.angle);
+    const sin = Math.sin(p.angle);
+    const gap = p.r + 9;
+    if (Math.abs(cos) < 0.35) {
+      // Top or bottom: centred label above/below the star.
+      const below = sin > 0;
+      return { x: p.x, y: below ? p.y + gap + 12 : p.y - gap - 18, anchor: "middle" as const };
+    }
+    return { x: p.x + cos * gap + (cos > 0 ? 4 : -4), y: p.y + sin * gap * 0.6 - 2, anchor: cos > 0 ? ("start" as const) : ("end" as const) };
+  };
   const quickStart = () => {
     putMany(
       "domains",
@@ -178,7 +201,7 @@ function Constellation({ domains, entries, ideas }: { domains: Domain[]; entries
               + Domain
             </button>
           </div>
-          <svg viewBox={`0 0 ${S} ${S}`} className="constellation">
+          <svg viewBox={`0 0 ${W} ${H}`} className="constellation">
             {[...links.entries()].map(([k, n]) => {
               const [a, b] = k.split("|");
               const pa = pos.get(a);
@@ -188,26 +211,26 @@ function Constellation({ domains, entries, ideas }: { domains: Domain[]; entries
             })}
             {stats.map((s) => {
               const p = pos.get(s.d.id)!;
-              return <line key={`c${s.d.id}`} x1={c} y1={c} x2={p.x} y2={p.y} className="spoke" />;
+              return <line key={`c${s.d.id}`} x1={cx} y1={cy} x2={p.x} y2={p.y} className="spoke" />;
             })}
-            <circle cx={c} cy={c} r="22" className="you-star" />
-            <text x={c} y={c + 7} className="star-emoji">
+            <circle cx={cx} cy={cy} r="24" className="you-star" />
+            <text x={cx} y={cy + 7} className="star-emoji">
               🧠
             </text>
             {stats.map((s) => {
               const p = pos.get(s.d.id)!;
-              const r = 12 + 20 * Math.sqrt(s.mins / maxMins);
+              const l = labelFor(p);
               return (
                 <g key={s.d.id} className="star" onClick={() => setEditing(s.d)}>
-                  <circle cx={p.x} cy={p.y} r={r + 6} style={{ fill: s.d.color }} className="star-glow" />
-                  <circle cx={p.x} cy={p.y} r={r} style={{ fill: "#0d0d18", stroke: s.d.color }} className="star-core" />
-                  <text x={p.x} y={p.y + 6} className="star-emoji" style={{ fontSize: Math.max(14, r * 0.9) }}>
+                  <circle cx={p.x} cy={p.y} r={p.r + 6} style={{ fill: s.d.color }} className="star-glow" />
+                  <circle cx={p.x} cy={p.y} r={p.r} style={{ fill: "#0d0d18", stroke: s.d.color }} className="star-core" />
+                  <text x={p.x} y={p.y + p.r * 0.35} className="star-emoji" style={{ fontSize: Math.max(13, p.r * 0.95) }}>
                     {s.d.emoji}
                   </text>
-                  <text x={p.x} y={p.y + r + 16} className="star-label">
+                  <text x={l.x} y={l.y} className="star-label" textAnchor={l.anchor}>
                     {s.d.name}
                   </text>
-                  <text x={p.x} y={p.y + r + 29} className="star-sub">
+                  <text x={l.x} y={l.y + 14} className="star-sub" textAnchor={l.anchor}>
                     {s.tier.name} · {fmtHours(s.mins)}
                   </text>
                 </g>

@@ -559,7 +559,7 @@ input:focus, select:focus, textarea:focus { outline: none; box-shadow: var(--glo
 .resurface p { margin: 6px 0 2px; font-style: italic; }
 .atlas-tabs { flex-wrap: wrap; }
 .constellation-card { display: flex; flex-direction: column; align-items: stretch; }
-.constellation { width: 100%; max-width: 520px; margin: 0 auto; display: block; }
+.constellation { width: 100%; max-width: 720px; margin: 0 auto; display: block; }
 .spoke { stroke: rgb(255 255 255 / 0.06); stroke-width: 1; }
 .link-line { stroke: #fcd34d; stroke-opacity: 0.55; stroke-linecap: round; }
 .you-star { fill: #0d0d18; stroke: var(--accent); stroke-width: 2; }
@@ -567,8 +567,8 @@ input:focus, select:focus, textarea:focus { outline: none; box-shadow: var(--glo
 .star-glow { opacity: 0.18; }
 .star-core { stroke-width: 2.5; }
 .star-emoji { text-anchor: middle; font-size: 18px; }
-.star-label { text-anchor: middle; fill: var(--text); font-size: 11.5px; font-weight: 700; }
-.star-sub { text-anchor: middle; fill: #b4b1cc; font-size: 9.5px; }
+.star-label { fill: var(--text); font-size: 14px; font-weight: 700; paint-order: stroke; stroke: #0b0b14; stroke-width: 4px; stroke-linejoin: round; }
+.star-sub { fill: #b4b1cc; font-size: 11.5px; paint-order: stroke; stroke: #0b0b14; stroke-width: 4px; stroke-linejoin: round; }
 .center-text { text-align: center; }
 .domain-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(230px, 1fr)); gap: 12px; }
 .domain-card { font: inherit; color: var(--text); text-align: left; cursor: pointer; display: flex; flex-direction: column; gap: 6px; border-top: 3px solid var(--dc); }
