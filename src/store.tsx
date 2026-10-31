@@ -154,12 +154,14 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       del: (col, id) => {
         // Cascade so we don't leave orphans behind.
         const pairs: [Col, string][] = [[col, id]];
-        if (col === "goals") alive("tasks").filter((x) => x.goalId === id).forEach((x) => pairs.push(["tasks", x.id]));
+        if (col === "goals") {
+          alive("tasks").filter((x) => x.goalId === id).forEach((x) => pairs.push(["tasks", x.id]));
+          alive("goalLogs").filter((x) => x.goalId === id).forEach((x) => pairs.push(["goalLogs", x.id]));
+        }
         if (col === "seasons") {
-          for (const g of alive("goals").filter((g) => g.seasonId === id)) {
-            pairs.push(["goals", g.id]);
-            alive("tasks").filter((x) => x.goalId === g.id).forEach((x) => pairs.push(["tasks", x.id]));
-          }
+          // Quests outlive seasons: they simply become "ongoing".
+          const orphans = alive("goals").filter((g) => g.seasonId === id);
+          if (orphans.length) putMany("goals", orphans.map((g) => ({ ...g, seasonId: "" })));
         }
         if (col === "habits") alive("habitLogs").filter((x) => x.habitId === id).forEach((x) => pairs.push(["habitLogs", x.id]));
         if (col === "workouts") alive("entries").filter((x) => x.workoutId === id).forEach((x) => pairs.push(["entries", x.id]));

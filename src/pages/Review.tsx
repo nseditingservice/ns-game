@@ -99,10 +99,13 @@ Reflection — Wins: ${review.wins || "-"} | Challenges: ${review.challenges || 
   const lastMonth = addMonths(todayStr(), -1).slice(0, 7);
   const wheel = (data.wheels[month] && !data.wheels[month].del ? data.wheels[month] : null) ?? { id: month, u: 0, month, scores: {} };
   const prevWheel = data.wheels[lastMonth] && !data.wheels[lastMonth].del ? data.wheels[lastMonth] : null;
-  const rate = (a: Area, v: number) => {
+  const rate = (a: Area, v: number | null) => {
     const first = !Object.keys(wheel.scores).length;
-    put("wheels", { ...wheel, scores: { ...wheel.scores, [a]: v } });
-    if (first) celebrate("Wheel of Life +30 XP", "🎡");
+    const scores = { ...wheel.scores };
+    if (v == null) delete scores[a];
+    else scores[a] = v;
+    put("wheels", { ...wheel, scores });
+    if (first && v != null) celebrate("Wheel of Life +30 XP", "🎡");
   };
   const areaLevels = Object.fromEntries(AREAS.map((a) => [a, levelFor(xp.byArea[a], 0.5).level])) as Record<Area, number>;
   const maxLvl = Math.max(5, ...Object.values(areaLevels));
@@ -190,13 +193,25 @@ Reflection — Wins: ${review.wins || "-"} | Challenges: ${review.challenges || 
         <section className="card">
           <h2>🎡 Wheel of Life · {fmtDay(`${month}-01`, { month: "long" })}</h2>
           <p className="muted small">Once a month, rate how satisfied you feel with each area (1–10). Dashed = last month.</p>
+          {Object.keys(wheel.scores).length > 0 && (
+            <button className="btn ghost small" onClick={() => confirm("Clear this month's Wheel of Life rating? (removes its 30 XP)") && put("wheels", { ...wheel, scores: {} })}>
+              Clear this month's rating
+            </button>
+          )}
           <Radar max={10} series={[...(prevWheel ? [{ values: prevWheel.scores, color: "#94a3b8" }] : []), { values: wheel.scores, color: "var(--accent)", fill: true }]} />
           {AREAS.map((a) => (
             <div key={a} className="wheel-row">
               <span>
                 {AREA_INFO[a].emoji} {AREA_INFO[a].label}
               </span>
-              <input type="range" min={1} max={10} value={wheel.scores[a] ?? 5} onChange={(e) => rate(a, Number(e.target.value))} />
+              <select value={wheel.scores[a] ?? ""} onChange={(e) => rate(a, e.target.value ? Number(e.target.value) : null)}>
+                <option value="">not rated</option>
+                {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map((n) => (
+                  <option key={n} value={n}>
+                    {n} / 10
+                  </option>
+                ))}
+              </select>
               <b>{wheel.scores[a] ?? "–"}</b>
             </div>
           ))}

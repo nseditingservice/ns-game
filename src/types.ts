@@ -26,12 +26,80 @@ export interface Season extends Rec {
 }
 
 export interface Goal extends Rec {
-  seasonId: string;
+  seasonId: string; // "" = ongoing quest (not tied to a season)
   title: string;
   why: string;
   color: string;
   area: Area;
   done: boolean;
+  /** How progress is measured. Missing = progress from completed tasks. */
+  metric?: GoalMetric;
+  milestones?: Milestone[];
+  hero?: string; // your character on the map
+  boss?: string; // what waits at the end
+  deadline?: string; // optional YYYY-MM-DD
+}
+
+export interface GoalMetric {
+  unit: string; // "$" for money (US dollars), or "kg", "clients", "km"…
+  target: number;
+  /** total: add up all logs · monthly/weekly: add up logs in the current month/week ·
+   *  latest: the most recent value counts (e.g. body weight, MRR) */
+  mode: "total" | "monthly" | "weekly" | "latest";
+  start: number; // starting value (for total/latest)
+}
+
+export interface Milestone {
+  id: string;
+  at: number; // fraction 0–1 of the way to the target
+  name: string;
+  reward: string;
+}
+
+export interface GoalLog extends Rec {
+  goalId: string;
+  date: string;
+  value: number;
+  note: string;
+}
+
+/** Polymath: a field of interest, fed by the time on its tags. */
+export interface Domain extends Rec {
+  name: string;
+  emoji: string;
+  color: string;
+  tagIds: string[];
+  projects: string[]; // project names that count toward this domain
+  why: string;
+}
+
+/** Commonplace-book entry. */
+export interface Idea extends Rec {
+  date: string;
+  text: string;
+  source: string;
+  domainIds: string[];
+  links: string[]; // other idea ids
+}
+
+/** Feynman-style favourite problem. */
+export interface Problem extends Rec {
+  text: string;
+  domainIds: string[];
+  notes: string;
+  status: "open" | "solved";
+  createdAt: string;
+}
+
+export interface LibraryItem extends Rec {
+  title: string;
+  kind: "book" | "course" | "video" | "podcast" | "article" | "paper";
+  creator: string;
+  domainIds: string[];
+  status: "queue" | "active" | "done";
+  rating: number | null;
+  takeaways: string;
+  finishedAt?: string;
 }
 
 export interface Task extends Rec {
@@ -222,10 +290,15 @@ export interface Data {
   reviews: Record<string, Review>;
   wheels: Record<string, Wheel>;
   journal: Record<string, Journal>;
+  goalLogs: Record<string, GoalLog>;
+  domains: Record<string, Domain>;
+  ideas: Record<string, Idea>;
+  problems: Record<string, Problem>;
+  library: Record<string, LibraryItem>;
   meta: Record<string, Prefs | Timer>;
 }
 export type Col = keyof Data;
-export const COLS: Col[] = ["seasons", "goals", "tasks", "plans", "tags", "entries", "habits", "habitLogs", "healthDays", "workouts", "meals", "reviews", "wheels", "journal", "meta"];
+export const COLS: Col[] = ["seasons", "goals", "tasks", "plans", "tags", "entries", "habits", "habitLogs", "healthDays", "workouts", "meals", "reviews", "wheels", "journal", "goalLogs", "domains", "ideas", "problems", "library", "meta"];
 export type ItemOf<C extends Col> = Data[C][string];
 
 /** Device-only settings (never synced). */
@@ -233,7 +306,8 @@ export interface Local {
   apiKey: string;
   firebaseConfig: string;
   lastSync: number;
+  lastBackup?: number;
   dirty: string[]; // `${col}/${id}` waiting to upload
 }
 
-export type Page = "today" | "calendar" | "did" | "habits" | "health" | "goals" | "focus" | "review" | "journal" | "trophies" | "settings" | "more";
+export type Page = "today" | "calendar" | "did" | "habits" | "health" | "goals" | "focus" | "review" | "journal" | "trophies" | "atlas" | "settings" | "more";

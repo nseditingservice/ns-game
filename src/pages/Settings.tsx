@@ -4,6 +4,7 @@ import { COLS, type Data } from "../types";
 import { parseConfig, useSync } from "../sync";
 import { BUILT_IN_FIREBASE_CONFIG } from "../config";
 import { XP_RULES } from "../game";
+import { downloadBackup } from "../backup";
 
 const ACCENTS: [string, string][] = [
   ["Arcane", "#a78bfa"],
@@ -40,12 +41,8 @@ export default function SettingsPage() {
   };
 
   const exportData = () => {
-    const blob = new Blob([JSON.stringify({ app: "ns-game", version: 1, exportedAt: new Date().toISOString(), data }, null, 2)], { type: "application/json" });
-    const a = document.createElement("a");
-    a.href = URL.createObjectURL(blob);
-    a.download = `ns-game-backup-${new Date().toISOString().slice(0, 10)}.json`;
-    a.click();
-    URL.revokeObjectURL(a.href);
+    downloadBackup(data);
+    setLocal({ lastBackup: Date.now() });
   };
   const importData = async (f: File) => {
     try {
@@ -196,7 +193,10 @@ export default function SettingsPage() {
       <section className="card form">
         <h2>💾 Your data</h2>
         <p className="muted small">{counts.join(" · ")}</p>
-        <p className="muted small">Export a backup every month or so. With sync on, your data is also safe in your Firebase account.</p>
+        <p className="muted small">
+          Export a backup every month or so. With sync on, your data is also safe in your Firebase account.
+          {local.lastBackup ? ` Last backup: ${new Date(local.lastBackup).toLocaleDateString()}.` : " No backup exported yet."}
+        </p>
         <div className="row wrap">
           <button className="btn" onClick={exportData}>
             Export backup

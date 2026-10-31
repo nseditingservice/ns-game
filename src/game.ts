@@ -5,6 +5,7 @@ import { useMemo } from "react";
 import { useStore } from "./store";
 import { AREAS, type Area, type Data, type Entry, type Habit, type HabitLog, type HealthDay, type Journal, type Meal, type Tag, type Workout } from "./types";
 import { waterMl, waterTargetL } from "./water";
+import { questXp } from "./quest";
 import { addDays, todayStr, weekdayIdx } from "./dates";
 
 export interface Index {
@@ -216,6 +217,8 @@ export function extraXpForDay(date: string, d: Data): XpItem[] {
   const goalArea = new Map(alive(d.goals).map((g) => [g.id, g.area]));
   const out: XpItem[] = [];
   for (const t of alive(d.tasks)) if (t.done && t.doneAt && t.doneAt.slice(0, 10) === date) out.push({ label: `Task: ${t.title}`, xp: 10, area: (t.goalId && goalArea.get(t.goalId)) || "work" });
+  for (const q of questXp(d)) if (q.date === date) out.push({ label: q.label, xp: q.xp, area: q.area });
+  for (const x of polymathXp(d)) if (x.date === date) out.push({ label: x.label, xp: x.xp, area: x.area });
   return out;
 }
 
@@ -226,16 +229,29 @@ export function totalXp(d: Data, ix: Index) {
   for (const l of ix.logs.values()) dates.add(l.date);
   for (const h of ix.habits) for (let x = h.createdAt, i = 0; x <= todayStr() && i < 2000; x = addDays(x, 1), i++) dates.add(x);
   const perDay = new Map<string, number>();
+  // Full audit trail so the player can always see where every XP point came from.
+  const history: { date: string; items: XpItem[] }[] = [];
+  const oneOff = (date: string, item: XpItem) => {
+    byArea[item.area] += item.xp;
+    history.push({ date, items: [item] });
+  };
   for (const date of dates) {
     const x = dayXp(date, ix);
     perDay.set(date, x.total);
     for (const a of AREAS) byArea[a] += x.byArea[a];
+    if (x.items.length) history.push({ date, items: x.items });
   }
-  for (const t of alive(d.tasks)) if (t.done) byArea[(t.goalId && goalArea.get(t.goalId)) || "work"] += 10;
-  for (const g of alive(d.goals)) if (g.done) byArea[g.area] += 200;
-  for (const r of alive(d.reviews)) if (r.wins || r.lessons || r.challenges || r.nextFocus) byArea.mind += 50;
-  for (const w of alive(d.wheels)) if (Object.keys(w.scores).length) byArea.spirit += 30;
-  return { total: AREAS.reduce((n, a) => n + byArea[a], 0), byArea, perDay };
+  for (const t of alive(d.tasks)) if (t.done) oneOff(t.doneAt?.slice(0, 10) ?? t.week, { label: `Task: ${t.title}`, xp: 10, area: (t.goalId && goalArea.get(t.goalId)) || "work" });
+  for (const g of alive(d.goals)) if (g.done && !g.metric) oneOff(todayStr(), { label: `Goal achieved: ${g.title}`, xp: 200, area: g.area });
+  for (const q of questXp(d)) oneOff(q.date, { label: q.label, xp: q.xp, area: q.area });
+  for (const x of polymathXp(d)) oneOff(x.date, { label: x.label, xp: x.xp, area: x.area });
+  for (const r of alive(d.reviews)) if (r.wins || r.lessons || r.challenges || r.nextFocus) oneOff(r.week, { label: `Weekly review (week of ${r.week})`, xp: 50, area: "mind" });
+  for (const w of alive(d.wheels)) if (Object.keys(w.scores).length) oneOff(`${w.month}-01`, { label: `Wheel of Life rating (${w.month})`, xp: 30, area: "spirit" });
+  // Merge entries per date, newest first.
+  const merged = new Map<string, XpItem[]>();
+  for (const h of history) merged.set(h.date, [...(merged.get(h.date) ?? []), ...h.items]);
+  const log = [...merged.entries()].map(([date, items]) => ({ date, items, total: items.reduce((n, i) => n + i.xp, 0) })).sort((a, b) => b.date.localeCompare(a.date));
+  return { total: AREAS.reduce((n, a) => n + byArea[a], 0), byArea, perDay, log };
 }
 
 /** Level curve: you start at level 0; level n → n+1 costs 100 + 50·n XP. */
@@ -262,4 +278,15 @@ export function useXp() {
     const x = totalXp(data, ix);
     return { ...x, lvl: levelFor(x.total) };
   }, [data, ix]);
+}
+
+/** Polymath XP: ideas (+5, +5 more if they bridge two domains or link ideas), finished library items (+20). */
+export function polymathXp(d: Data): { date: string; label: string; xp: number; area: Area }[] {
+  const out: { date: string; label: string; xp: number; area: Area }[] = [];
+  for (const i of alive(d.ideas ?? {})) {
+    out.push({ date: i.date, label: "Idea captured", xp: 5, area: "mind" });
+    if (i.domainIds.length >= 2 || i.links.length) out.push({ date: i.date, label: "Cross-pollination: idea connects fields", xp: 5, area: "mind" });
+  }
+  for (const b of alive(d.library ?? {})) if (b.status === "done" && b.finishedAt) out.push({ date: b.finishedAt, label: `Finished: ${b.title}`, xp: 20, area: "mind" });
+  return out;
 }

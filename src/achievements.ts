@@ -5,6 +5,7 @@ import { AREAS, type Data } from "./types";
 import { addDays, weekStart } from "./dates";
 import { bestStreak, entryMins, useIndex, useXp, type Index } from "./game";
 import { waterMl } from "./water";
+import { questXp } from "./quest";
 
 export interface Trophy {
   id: string;
@@ -54,6 +55,14 @@ export function computeTrophies(d: Data, ix: Index, level: number): Trophy[] {
     logStreak = Math.max(logStreak, run);
   }
 
+  const ideas = alive(d.ideas);
+  const crossIdeas = ideas.filter((i) => i.domainIds.length >= 2 || i.links.length).length;
+  const booksDone = alive(d.library).filter((b) => b.status === "done").length;
+  const problemsN = alive(d.problems).length;
+  const domainsN = alive(d.domains).length;
+  const qx = questXp(d);
+  const checkpoints = qx.filter((x) => x.label.startsWith("Checkpoint")).length;
+  const bosses = qx.filter((x) => x.label.startsWith("Boss")).length;
   const T = (id: string, emoji: string, name: string, desc: string, tier: Trophy["tier"], value: number, target: number): Trophy => ({ id, emoji, name, desc, tier, value: Math.min(value, target), target });
   return [
     T("first-log", "🌱", "The First Step", "Log your first activity", "bronze", entries.length, 1),
@@ -81,6 +90,14 @@ export function computeTrophies(d: Data, ix: Index, level: number): Trophy[] {
     T("projects-5", "🗂️", "Many Hats", "Log time on 5 different projects", "bronze", projects, 5),
     T("tags-5x10", "🎭", "Renaissance Mind", "10+ hours on 5 different tags", "gold", tagsWith10h, 5),
     T("polymath", "🌌", "Polymath", `Log time in all ${AREAS.length} life areas in one week`, "mythic", maxAreas, AREAS.length),
+    T("quest-cp", "⛺", "Wayfarer", "Reach your first quest checkpoint", "bronze", checkpoints, 1),
+    T("quest-boss", "🐲", "Dragonslayer", "Defeat a quest boss", "gold", bosses, 1),
+    T("quest-boss-6", "⚔️", "Legend of the Realm", "Defeat 6 quest bosses", "mythic", bosses, 6),
+    T("ideas-25", "🪶", "Commonplace", "Capture 25 ideas", "bronze", ideas.length, 25),
+    T("medici", "⚡", "The Medici Effect", "10 ideas that connect different fields", "gold", crossIdeas, 10),
+    T("library-12", "📚", "Renaissance Library", "Finish 12 books, courses or more", "silver", booksDone, 12),
+    T("feynman", "❓", "Feynman's Dozen", "Keep 12 favorite problems", "silver", problemsN, 12),
+    T("domains-5", "🌌", "Constellation", "Map 5 domains in your Mind Atlas", "bronze", domainsN, 5),
     T("level-5", "⭐", "Seeker", "Reach level 5", "bronze", level, 5),
     T("level-25", "🌟", "Sage", "Reach level 25", "gold", level, 25),
     T("level-50", "👑", "Philosopher-King", "Reach level 50", "mythic", level, 50),

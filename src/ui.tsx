@@ -37,7 +37,7 @@ export function Toasts() {
   const [toasts, setToasts] = useState<Toast[]>([]);
   useEffect(() => {
     const l = (t: Toast) => {
-      setToasts((x) => [...x, t]);
+      setToasts((x) => [...x, t].slice(-3));
       setTimeout(() => setToasts((x) => x.filter((y) => y.id !== t.id)), 2200);
     };
     listeners.add(l);

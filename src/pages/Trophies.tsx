@@ -50,7 +50,7 @@ export default function Trophies() {
                     <div className={`fill-${t.tier}`} style={{ width: `${(t.value / t.target) * 100}%` }} />
                   </div>
                   <div className="trophy-progress">
-                    {Math.floor(t.value).toLocaleString()} / {t.target.toLocaleString()}
+                    {Math.floor(t.value).toLocaleString("en-US")} / {t.target.toLocaleString("en-US")}
                   </div>
                 </>
               )}

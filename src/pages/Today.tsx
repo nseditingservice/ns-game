@@ -5,15 +5,21 @@ import { fmtDay, fmtHours, fmtTime, nowMins, todayStr, weekStart } from "../date
 import { autoProgress, dayXp, entryMins, extraXpForDay, habitStatus, habitStreak, isScheduled, titleFor, useIndex, useXp } from "../game";
 import { useHabitToggle } from "../habitActions";
 import { timerDisplay, useNow } from "../focus";
-import { celebrate, Empty, useTimerActions } from "../ui";
+import { celebrate, Empty, Modal, useTimerActions } from "../ui";
 import { AREA_INFO, type HealthDay, type Task } from "../types";
-import { quoteOfDay } from "../quotes";
+import { useDailyQuote } from "../useQuote";
 import { fmtL, waterMl } from "../water";
 import { ProjectInput } from "../components/EntryEditor";
 import { useTrophies } from "../achievements";
+import { fmtVal, questState } from "../quest";
+import { useSync } from "../sync";
+import { downloadBackup } from "../backup";
 
 export default function Today({ go }: { go: Go }) {
-  const { prefs, timer, put, data } = useStore();
+  const { prefs, timer, put, data, local, setLocal } = useStore();
+  const sync = useSync();
+  const goalLogs = useList("goalLogs");
+  const quests = useList("goals").filter((g) => !g.done);
   const ix = useIndex();
   const xp = useXp();
   const tags = useList("tags").filter((t) => !t.archived);
@@ -28,7 +34,8 @@ export default function Today({ go }: { go: Go }) {
   const week = weekStart(today);
   const [newTask, setNewTask] = useState("");
   const [showXp, setShowXp] = useState(false);
-  const [quote, author] = quoteOfDay(today);
+  const [showHistory, setShowHistory] = useState(false);
+  const { text: quote, author, credit } = useDailyQuote(today);
 
   const xpToday = dayXp(today, ix);
   const xpItems = [...xpToday.items, ...extraXpForDay(today, data)];
@@ -80,6 +87,11 @@ export default function Today({ go }: { go: Go }) {
       <section className="card quote-card">
         <p className="quote">“{quote}”</p>
         <p className="quote-author">— {author}</p>
+        {credit && (
+          <a className="quote-credit" href={credit.href} target="_blank" rel="noreferrer">
+            Quote via {credit.text}
+          </a>
+        )}
       </section>
 
       <section className="card hero">
@@ -98,7 +110,10 @@ export default function Today({ go }: { go: Go }) {
               <div style={{ width: `${(xp.lvl.into / xp.lvl.need) * 100}%` }} />
             </div>
             <div className="muted tiny">
-              {xp.lvl.need - xp.lvl.into} XP to level {xp.lvl.level + 1} · {xp.total.toLocaleString()} XP total
+              {xp.lvl.need - xp.lvl.into} XP to level {xp.lvl.level + 1} ·{" "}
+              <button className="link-inline" onClick={() => setShowHistory(true)}>
+                {xp.total.toLocaleString("en-US")} XP total ▸ where from?
+              </button>
             </div>
           </div>
         </div>
@@ -136,6 +151,79 @@ export default function Today({ go }: { go: Go }) {
           </div>
         </div>
       </section>
+
+      {showHistory && (
+        <Modal title={`XP history · ${xp.total.toLocaleString("en-US")} XP`} onClose={() => setShowHistory(false)}>
+          <p className="muted small">Every point you've earned, newest first. XP is calculated from your log, so if you delete or change something, its XP changes too.</p>
+          {!xp.log.length && <Empty>No XP yet. Complete a habit or log something to start.</Empty>}
+          {xp.log.slice(0, 120).map((d) => (
+            <div key={d.date} className="xp-day">
+              <div className="row between">
+                <b>{d.date === today ? "Today" : fmtDay(d.date, { weekday: "short", day: "numeric", month: "short", year: "numeric" })}</b>
+                <b className="accent-text">+{d.total}</b>
+              </div>
+              {d.items.map((i, k) => (
+                <div key={k} className="xp-line">
+                  <span>
+                    {AREA_INFO[i.area].emoji} {i.label}
+                  </span>
+                  <span>+{i.xp}</span>
+                </div>
+              ))}
+            </div>
+          ))}
+        </Modal>
+      )}
+
+      {!sync.email && (!local.lastBackup || Date.now() - local.lastBackup > 30 * 864e5) && Object.keys(data.entries).length + Object.keys(data.goalLogs ?? {}).length > 5 && (
+        <section className="card backup-nudge">
+          <span>
+            💾 <b>Protect your progress.</b> <span className="muted small">Cloud sync is off and you haven't saved a backup in 30 days.</span>
+          </span>
+          <span className="row">
+            <button className="btn small primary" onClick={() => { downloadBackup(data); setLocal({ lastBackup: Date.now() }); }}>
+              Download backup
+            </button>
+            <button className="btn small ghost" onClick={() => go("settings")}>
+              Turn on sync
+            </button>
+          </span>
+        </section>
+      )}
+
+      {quests.length > 0 && (
+        <section className="card">
+          <div className="card-head">
+            <h2>⚔️ Active quests</h2>
+            <button className="btn ghost small" onClick={() => go("goals")}>
+              Quest map →
+            </button>
+          </div>
+          {quests.slice(0, 5).map((g) => {
+            const st = questState(g, goalLogs, tasks);
+            const v = (n: number) => (st.kind === "tasks" ? `${Math.round(n)}` : fmtVal(n, st.unit));
+            return (
+              <div key={g.id} className="quest-mini" onClick={() => go("goals")}>
+                <span className="quest-mini-hero">{g.hero ?? "🧙"}</span>
+                <div className="grow">
+                  <div className="row between small">
+                    <b>{g.title}</b>
+                    <span>
+                      {v(st.current)} <span className="muted">/ {v(st.target)}</span>
+                    </span>
+                  </div>
+                  <div className="bar thin">
+                    <div style={{ width: `${Math.min(100, st.frac * 100)}%`, background: g.color }} />
+                  </div>
+                  <div className="muted tiny">
+                    {st.done ? `🏆 Boss defeated${st.periodLabel ? ` · ${st.periodLabel}` : ""}` : st.perDayNeeded ? `Daily quest: ${v(st.perDayNeeded)} · ${st.next ? `next: ${st.next.name}` : "next: the boss"}` : st.next ? `Next checkpoint: ${st.next.name}` : "Next: the boss"}
+                  </div>
+                </div>
+              </div>
+            );
+          })}
+        </section>
+      )}
 
       <section className="card">
         <div className="card-head">

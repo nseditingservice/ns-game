@@ -2,7 +2,7 @@ import { useState } from "react";
 import { useList, useStore } from "../store";
 import type { Journal } from "../types";
 import { addDays, fmtDay, todayStr } from "../dates";
-import { quoteOfDay } from "../quotes";
+import { useDailyQuote } from "../useQuote";
 import { celebrate, Empty } from "../ui";
 
 const PROMPTS: { key: "learned" | "grateful" | "thoughts"; label: string; hint: string }[] = [
@@ -18,7 +18,7 @@ export default function JournalPage() {
   const [query, setQuery] = useState("");
   const today = todayStr();
   const j: Journal = (data.journal?.[date] && !data.journal[date].del ? data.journal[date] : null) ?? { id: date, u: 0, date, learned: "", grateful: "", thoughts: "" };
-  const [quote, author] = quoteOfDay(date);
+  const { text: quote, author, credit } = useDailyQuote(date);
   let streak = 0;
   const has = new Set(all.map((x) => x.date));
   for (let d = has.has(today) ? today : addDays(today, -1); has.has(d); d = addDays(d, -1)) streak++;
@@ -60,6 +60,11 @@ export default function JournalPage() {
       <section className="card quote-card">
         <p className="quote">“{quote}”</p>
         <p className="quote-author">— {author}</p>
+        {credit && (
+          <a className="quote-credit" href={credit.href} target="_blank" rel="noreferrer">
+            Quote via {credit.text}
+          </a>
+        )}
       </section>
 
       <section className="card form journal-card">

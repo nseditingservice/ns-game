@@ -7,6 +7,7 @@ import { celebrate, Toasts } from "./ui";
 import { useTrophies } from "./achievements";
 import JournalPage from "./pages/Journal";
 import Trophies from "./pages/Trophies";
+import Atlas from "./pages/Atlas";
 import { useSync } from "./sync";
 import Today from "./pages/Today";
 import Calendar from "./pages/Calendar";
@@ -24,7 +25,8 @@ export const NAV: { id: Page; label: string; icon: string; mobile?: boolean }[] 
   { id: "did", label: "Things I Did", icon: "📊", mobile: true },
   { id: "habits", label: "Habits", icon: "✅", mobile: true },
   { id: "health", label: "Health", icon: "💪", mobile: true },
-  { id: "goals", label: "Goals", icon: "🎯" },
+  { id: "goals", label: "Quests", icon: "🗺️" },
+  { id: "atlas", label: "Mind Atlas", icon: "🌌" },
   { id: "focus", label: "Focus", icon: "⏱️" },
   { id: "journal", label: "Journal", icon: "🪶" },
   { id: "review", label: "Review", icon: "📝" },
@@ -156,6 +158,7 @@ export default function App() {
         {page === "review" && <ReviewPage />}
         {page === "journal" && <JournalPage />}
         {page === "trophies" && <Trophies />}
+        {page === "atlas" && <Atlas />}
         {page === "settings" && <SettingsPage />}
         {page === "more" && <More go={go} />}
       </main>
@@ -167,7 +170,7 @@ export default function App() {
             <small>{n.id === "did" ? "I Did" : n.label}</small>
           </button>
         ))}
-        <button className={["goals", "focus", "journal", "review", "trophies", "settings", "more"].includes(page) ? "active" : ""} onClick={() => go("more")}>
+        <button className={["goals", "atlas", "focus", "journal", "review", "trophies", "settings", "more"].includes(page) ? "active" : ""} onClick={() => go("more")}>
           <span>☰</span>
           <small>More</small>
         </button>
