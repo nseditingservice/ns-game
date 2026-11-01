@@ -1,14 +1,25 @@
-import { useMemo } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { uid, useList, useStore } from "../store";
 import { DEFAULT_WASTE_LIMIT, SAID_NO_TAG_ID } from "../types";
 import { addDays, fmtHours, monthStart, nowMins, todayStr, weekStart, yearStart } from "../dates";
 import { entryMins, isWasted, useIndex } from "../game";
 import { celebrate, useTimerActions } from "../ui";
+import { EntryEditor } from "./EntryEditor";
+import type { Entry } from "../types";
+import { fmtTime } from "../dates";
 import type { Go } from "../App";
 
 /** "Time I could have said NO to" dashboard: makes wasted time impossible to ignore. */
 export function WasteCard({ go }: { go: Go }) {
-  const { prefs, put, timer } = useStore();
+  const { prefs, put, del, timer } = useStore();
+  const [lastAdded, setLastAdded] = useState<{ id: string; mins: number } | null>(null);
+  const [editing, setEditing] = useState<Entry | null>(null);
+  // The undo button stays for 20 seconds after a quick-add.
+  useEffect(() => {
+    if (!lastAdded) return;
+    const t = setTimeout(() => setLastAdded(null), 20000);
+    return () => clearTimeout(t);
+  }, [lastAdded]);
   const ix = useIndex();
   const entries = useList("entries");
   const timerAct = useTimerActions();
@@ -55,13 +66,22 @@ export function WasteCard({ go }: { go: Go }) {
       celebrate("No free time left today to log that", "🤔");
       return;
     }
-    put("entries", { id: uid(), tagId: saidNo.id, date: today, start: end - mins, end, note: "", taskId: null, source: "manual", wasted: true });
+    const id = uid();
+    put("entries", { id, tagId: saidNo.id, date: today, start: end - mins, end, note: "", taskId: null, source: "manual", wasted: true });
+    setLastAdded({ id, mins });
     celebrate(`Logged ${fmtHours(mins)}. Honesty is the first step`, "🚫");
   };
   const pct = limit ? Math.min(100, (s.today / limit) * 100) : 0;
   const over = s.today > limit;
   const delta = s.lastWeekSameSpan ? Math.round(((s.week - s.lastWeekSameSpan) / s.lastWeekSameSpan) * 100) : null;
   const m = s.month;
+  const todayWasted = entries.filter((e) => e.date === today && isWasted(e, ix.tags)).sort((a, b) => a.start - b.start);
+  // "Reality check": only comparisons that are meaningful (no "0 books").
+  const hours = m / 60;
+  const reality: string[] = [];
+  if (hours >= 1) reality.push(hours >= 8 ? `${(hours / 8).toFixed(1)} workdays` : `${hours.toFixed(1)} hours of deep work`);
+  if (hours >= 1) reality.push(`${Math.floor(hours)} workout${Math.floor(hours) === 1 ? "" : "s"}`);
+  if (hours >= 3) reality.push(hours >= 6 ? `${Math.floor(hours / 6)} book${Math.floor(hours / 6) === 1 ? "" : "s"}` : "half a book");
 
   return (
     <section className="card waste-card">
@@ -105,14 +125,40 @@ export function WasteCard({ go }: { go: Go }) {
           {delta <= 0 ? `▼ ${Math.abs(delta)}% less than this point last week. 🎉` : `▲ ${delta}% more than this point last week.`}
         </p>
       )}
-      {m >= 60 && (
+      {reality.length > 0 && (
         <p className="small reality">
-          This month = <b>{(m / 60 / 8).toFixed(1)} workdays</b>, or <b>{Math.floor(m / 60)} workouts</b>, or <b>{Math.floor(m / 360)} books</b> you could have had.
+          This month ={" "}
+          {reality.map((r, i) => (
+            <span key={r}>
+              {i > 0 && (i === reality.length - 1 ? ", or " : ", ")}
+              <b>{r}</b>
+            </span>
+          ))}{" "}
+          you could have had.
         </p>
       )}
       {s.sinks.length > 0 && (
         <div className="tiny muted">
           Biggest sinks this month: {s.sinks.map(([k, v]) => `${k} (${fmtHours(v)})`).join(" · ")}
+        </div>
+      )}
+      {todayWasted.length > 0 && (
+        <div className="waste-today-list">
+          <span className="muted tiny">Today:</span>
+          {todayWasted.map((e) => {
+            const t = ix.tags.get(e.tagId);
+            return (
+              <span key={e.id} className="waste-chip">
+                <button className="waste-chip-main" onClick={() => setEditing(e)} title="Edit">
+                  {t?.emoji ?? "🚫"} {fmtTime(e.start)}–{fmtTime(e.end)} · {fmtHours(entryMins(e))}
+                  {e.note ? ` · ${e.note}` : ""}
+                </button>
+                <button className="waste-chip-x" title="Remove this log" onClick={() => { del("entries", e.id); if (lastAdded?.id === e.id) setLastAdded(null); }}>
+                  ✕
+                </button>
+              </span>
+            );
+          })}
         </div>
       )}
       <div className="row wrap waste-actions">
@@ -122,12 +168,18 @@ export function WasteCard({ go }: { go: Go }) {
             +{fmtHours(mm)}
           </button>
         ))}
+        {lastAdded && (
+          <button className="btn small undo-btn" onClick={() => { del("entries", lastAdded.id); setLastAdded(null); celebrate("Undone", "↩"); }}>
+            ↩ Undo +{fmtHours(lastAdded.mins)}
+          </button>
+        )}
         {!timer && saidNo && (
           <button className="btn small ghost" onClick={() => timerAct.start({ label: saidNo.name, tagId: saidNo.id, plannedMins: null })}>
             ⏱ Start timer
           </button>
         )}
       </div>
+      {editing && <EntryEditor entry={editing} isNew={false} onClose={() => setEditing(null)} />}
     </section>
   );
 }

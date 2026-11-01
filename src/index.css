@@ -693,3 +693,9 @@ input:focus, select:focus, textarea:focus { outline: none; box-shadow: var(--glo
   .month-tabs { grid-template-columns: repeat(7, minmax(0, 1fr)); }
   .idea-stats b { font-size: 1.05rem; }
 }
+.waste-today-list { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; margin-top: 8px; }
+.waste-chip { display: inline-flex; align-items: stretch; border: 1px solid rgb(244 63 94 / 0.35); border-radius: 99px; overflow: hidden; background: rgb(244 63 94 / 0.08); }
+.waste-chip-main { all: unset; cursor: pointer; padding: 3px 4px 3px 10px; font-size: 0.78rem; color: #fecdd3; font-variant-numeric: tabular-nums; }
+.waste-chip-x { all: unset; cursor: pointer; padding: 3px 9px; font-size: 0.75rem; color: #fda4af; }
+.waste-chip-x:hover { background: rgb(244 63 94 / 0.25); color: #fff; }
+.undo-btn { border-color: #fbbf24 !important; color: #fcd34d !important; }
