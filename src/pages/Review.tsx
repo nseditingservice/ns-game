@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { EditAreasButton } from "../components/Areas";
 import { useStore } from "../store";
 import { AREAS, AREA_INFO, type Area, type Review } from "../types";
 import { addDays, addMonths, dateRange, fmtDay, fmtHours, todayStr, weekStart } from "../dates";
@@ -195,6 +196,7 @@ Reflection — Wins: ${review.wins || "-"} | Challenges: ${review.challenges || 
           <div className="row between">
             <h2>🎡 Wheel of Life · {fmtDay(`${month}-01`, { month: "long", year: "numeric" })}</h2>
             <span className="row">
+              <EditAreasButton />
               <button className="btn ghost small" title="Previous month" onClick={() => setWheelAnchor(addMonths(wheelAnchor, -1))}>
                 ←
               </button>
@@ -228,7 +230,10 @@ Reflection — Wins: ${review.wins || "-"} | Challenges: ${review.challenges || 
           ))}
         </section>
         <section className="card">
-          <h2>⚔️ Character stats</h2>
+          <div className="row between">
+            <h2>⚔️ Character stats</h2>
+            <EditAreasButton />
+          </div>
           <p className="muted small">Your level in each life area, earned from everything you log. Grow the weak spokes.</p>
           <Radar max={maxLvl} series={[{ values: areaLevels, color: "#f59e0b", fill: true }]} />
           {AREAS.map((a) => {

@@ -1,6 +1,6 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { get, set } from "idb-keyval";
-import { COLS, type Col, type Data, type ItemOf, type Local, type Prefs, type Tag, type Timer } from "./types";
+import { COLS, DEFAULT_AREAS, setAreaDefs, type Col, type Data, type ItemOf, type Local, type Prefs, type Tag, type Timer } from "./types";
 
 export type DistOmit<T, K extends PropertyKey> = T extends unknown ? Omit<T, K> : never;
 
@@ -142,6 +142,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
   const store = useMemo<Store | null>(() => {
     if (!data) return null;
     const prefs = { ...DEFAULT_PREFS, ...(data.meta.prefs as Prefs | undefined) };
+    setAreaDefs(prefs.areas?.length ? prefs.areas : DEFAULT_AREAS);
     const t = data.meta.timer as Timer | undefined;
     const alive = <C extends Col>(col: C) => Object.values(data[col]).filter((x) => !x.del) as ItemOf<C>[];
     return {

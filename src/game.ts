@@ -175,7 +175,7 @@ export function dayXp(date: string, ix: Index, today = todayStr()): XpDay {
   const items: XpItem[] = [];
   const add = (area: Area, xp: number, label: string) => {
     if (xp <= 0) return;
-    byArea[area] += xp;
+    byArea[area] = (byArea[area] ?? 0) + xp;
     items.push({ label, xp, area });
   };
   const scheduled = ix.habits.filter((h) => isScheduled(h, date));
@@ -209,7 +209,7 @@ export function dayXp(date: string, ix: Index, today = todayStr()): XpDay {
   if (hd && (hd.sleepHours != null || hd.weight != null || hd.mood != null)) add("body", 5, "Health check-in");
   const j = ix.journal.get(date);
   if (j && (j.learned || j.grateful || j.thoughts)) add("mind", 10, "Journal entry");
-  return { total: AREAS.reduce((n, a) => n + byArea[a], 0), byArea, items };
+  return { total: Object.values(byArea).reduce((n, v) => n + v, 0), byArea, items };
 }
 
 /** One-off XP that isn't tied to a single day's log (tasks, goals, reviews). */
@@ -232,13 +232,13 @@ export function totalXp(d: Data, ix: Index) {
   // Full audit trail so the player can always see where every XP point came from.
   const history: { date: string; items: XpItem[] }[] = [];
   const oneOff = (date: string, item: XpItem) => {
-    byArea[item.area] += item.xp;
+    byArea[item.area] = (byArea[item.area] ?? 0) + item.xp;
     history.push({ date, items: [item] });
   };
   for (const date of dates) {
     const x = dayXp(date, ix);
     perDay.set(date, x.total);
-    for (const a of AREAS) byArea[a] += x.byArea[a];
+    for (const [a, v] of Object.entries(x.byArea)) byArea[a] = (byArea[a] ?? 0) + v;
     if (x.items.length) history.push({ date, items: x.items });
   }
   for (const t of alive(d.tasks)) if (t.done) oneOff(t.doneAt?.slice(0, 10) ?? t.week, { label: `Task: ${t.title}`, xp: 10, area: (t.goalId && goalArea.get(t.goalId)) || "work" });
@@ -251,7 +251,7 @@ export function totalXp(d: Data, ix: Index) {
   const merged = new Map<string, XpItem[]>();
   for (const h of history) merged.set(h.date, [...(merged.get(h.date) ?? []), ...h.items]);
   const log = [...merged.entries()].map(([date, items]) => ({ date, items, total: items.reduce((n, i) => n + i.xp, 0) })).sort((a, b) => b.date.localeCompare(a.date));
-  return { total: AREAS.reduce((n, a) => n + byArea[a], 0), byArea, perDay, log };
+  return { total: Object.values(byArea).reduce((n, v) => n + v, 0), byArea, perDay, log };
 }
 
 /** Level curve: you start at level 0; level n → n+1 costs 100 + 50·n XP. */

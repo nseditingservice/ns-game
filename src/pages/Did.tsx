@@ -1,4 +1,5 @@
 import { useMemo, useState } from "react";
+import { AreaSelect, EditAreasButton } from "../components/Areas";
 import { PALETTE, uid, useList, useStore } from "../store";
 import { AREAS, AREA_INFO, type Area, type Entry, type Tag } from "../types";
 import { addDays, addMonths, dateRange, fmtDay, fmtHours, fmtTime, monthEnd, monthStart, todayStr, weekStart, yearEnd, yearStart } from "../dates";
@@ -173,7 +174,10 @@ export default function Did() {
 
       {total > 0 && (
         <section className="card">
-          <h2>By life area</h2>
+          <div className="card-head">
+            <h2>By life area</h2>
+            <EditAreasButton />
+          </div>
           <div className="stackbar">
             {AREAS.filter((a) => byArea.get(a)).map((a) => (
               <div key={a} style={{ flex: byArea.get(a), background: AREA_INFO[a].color }} title={`${AREA_INFO[a].label}: ${fmtHours(byArea.get(a)!)}`} />
@@ -415,13 +419,7 @@ function TagEditor({ tag, onClose }: { tag: Tag; onClose: () => void }) {
       <div className="row wrap">
         <label className="grow">
           Life area
-          <select value={t.area} onChange={(e) => setT({ ...t, area: e.target.value as Area })}>
-            {AREAS.map((a) => (
-              <option key={a} value={a}>
-                {AREA_INFO[a].emoji} {AREA_INFO[a].label}
-              </option>
-            ))}
-          </select>
+          <AreaSelect value={t.area} onChange={(area) => setT({ ...t, area })} />
         </label>
         <label>
           Weekly target (hours)

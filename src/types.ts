@@ -6,18 +6,38 @@ export interface Rec {
   del?: boolean;
 }
 
-export const AREAS = ["body", "mind", "work", "money", "people", "fun", "spirit", "home"] as const;
-export type Area = (typeof AREAS)[number];
-export const AREA_INFO: Record<Area, { label: string; emoji: string; color: string }> = {
-  body: { label: "Body & Health", emoji: "💪", color: "#10b981" },
-  mind: { label: "Mind & Learning", emoji: "🧠", color: "#6366f1" },
-  work: { label: "Career & Work", emoji: "💼", color: "#0ea5e9" },
-  money: { label: "Money", emoji: "💰", color: "#eab308" },
-  people: { label: "Relationships", emoji: "❤️", color: "#ec4899" },
-  fun: { label: "Fun & Rest", emoji: "🎮", color: "#f97316" },
-  spirit: { label: "Purpose & Spirit", emoji: "🌿", color: "#14b8a6" },
-  home: { label: "Home & Chores", emoji: "🏠", color: "#8b5cf6" },
-};
+// Life areas are user-editable (Settings → Life areas). These are the defaults.
+export type Area = string;
+export interface AreaDef {
+  id: string;
+  label: string;
+  emoji: string;
+  color: string;
+}
+export const DEFAULT_AREAS: AreaDef[] = [
+  { id: "body", label: "Body & Health", emoji: "💪", color: "#10b981" },
+  { id: "mind", label: "Mind & Learning", emoji: "🧠", color: "#6366f1" },
+  { id: "work", label: "Career & Work", emoji: "💼", color: "#0ea5e9" },
+  { id: "money", label: "Money", emoji: "💰", color: "#eab308" },
+  { id: "people", label: "Relationships", emoji: "❤️", color: "#ec4899" },
+  { id: "fun", label: "Fun & Rest", emoji: "🎮", color: "#f97316" },
+  { id: "spirit", label: "Purpose & Spirit", emoji: "🌿", color: "#14b8a6" },
+  { id: "home", label: "Home & Chores", emoji: "🏠", color: "#8b5cf6" },
+];
+
+// Live lookups, kept in sync with the user's settings by the store.
+// Unknown ids (e.g. an area that was deleted) read as "Other" instead of crashing.
+export let AREAS: string[] = [];
+const areaMap: Record<string, AreaDef> = {};
+export const AREA_INFO = new Proxy(areaMap, {
+  get: (t, k: string) => t[k] ?? { id: k, label: "Other", emoji: "❔", color: "#94a3b8" },
+}) as Record<string, AreaDef>;
+export function setAreaDefs(defs: AreaDef[]) {
+  AREAS = defs.map((d) => d.id);
+  for (const k of Object.keys(areaMap)) delete areaMap[k];
+  for (const d of defs) areaMap[d.id] = d;
+}
+setAreaDefs(DEFAULT_AREAS);
 
 export interface Season extends Rec {
   name: string;
@@ -255,6 +275,7 @@ export interface Prefs extends Rec {
   workoutTypes?: WorkoutType[];
   accent?: string;
   waterGoalL?: number;
+  areas?: AreaDef[];
 }
 
 export interface WorkoutType {

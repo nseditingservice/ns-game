@@ -1,4 +1,5 @@
 import { useRef, useState } from "react";
+import { AreaEditor } from "../components/Areas";
 import { useList, useStore } from "../store";
 import { COLS, type Data } from "../types";
 import { parseConfig, useSync } from "../sync";
@@ -109,6 +110,12 @@ export default function SettingsPage() {
             ))}
           </select>
         </label>
+      </section>
+
+      <section className="card">
+        <h2>🧭 Life areas</h2>
+        <p className="muted small">Rename, recolour, add or remove the areas of your life. Tags, habits and quests belong to an area, and XP builds your level in each one.</p>
+        <AreaEditor />
       </section>
 
       <section className="card form">

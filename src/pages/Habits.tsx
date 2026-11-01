@@ -1,10 +1,11 @@
 import { useState } from "react";
 import { uid, useList, useStore } from "../store";
-import { AREAS, AREA_INFO, type Area, type Habit, type HabitLink } from "../types";
+import { AREA_INFO, type Area, type Habit, type HabitLink } from "../types";
 import { addDays, dateRange, fmtDay, todayStr, weekStart } from "../dates";
 import { autoProgress, bestStreak, habitStatus, habitStreak, isScheduled, useIndex, type Index } from "../game";
 import { useHabitToggle } from "../habitActions";
 import { Modal } from "../ui";
+import { AreaSelect } from "../components/Areas";
 import { waterTargetL } from "../water";
 
 const DAY_NAMES = ["M", "T", "W", "T", "F", "S", "S"];
@@ -380,13 +381,7 @@ function HabitEditor({ habit, onClose }: { habit: Habit; onClose: () => void }) 
       </div>
       <label>
         Life area
-        <select value={h.area} onChange={(e) => setH({ ...h, area: e.target.value as Area })}>
-          {AREAS.map((a) => (
-            <option key={a} value={a}>
-              {AREA_INFO[a].emoji} {AREA_INFO[a].label}
-            </option>
-          ))}
-        </select>
+        <AreaSelect value={h.area} onChange={(area) => setH({ ...h, area })} />
       </label>
       <div className="row between">
         <button className="btn primary" disabled={!h.name.trim() || !h.days.length} onClick={() => { put("habits", { ...h, name: h.name.trim() }); onClose(); }}>

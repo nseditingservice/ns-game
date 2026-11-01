@@ -1,4 +1,5 @@
 import { useTrophies } from "../achievements";
+import { EditAreasButton } from "../components/Areas";
 import { AREAS, AREA_INFO } from "../types";
 import { levelFor, titleFor, TITLES, useXp } from "../game";
 
@@ -60,7 +61,10 @@ export default function Trophies() {
       </div>
 
       <section className="card">
-        <h2>⚔️ Character stats</h2>
+        <div className="row between">
+          <h2>⚔️ Character stats</h2>
+          <EditAreasButton />
+        </div>
         {AREAS.map((a) => {
           const l = levelFor(xp.byArea[a], 0.5);
           return (

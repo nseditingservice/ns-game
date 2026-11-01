@@ -1,6 +1,7 @@
 import { useLayoutEffect, useMemo, useRef, useState } from "react";
+import { AreaSelect } from "../components/Areas";
 import { PALETTE, uid, useList, useStore } from "../store";
-import { AREAS, AREA_INFO, type Area, type Goal, type GoalLog, type GoalMetric, type Milestone, type Season, type Task } from "../types";
+import { AREA_INFO, type Goal, type GoalLog, type GoalMetric, type Milestone, type Season, type Task } from "../types";
 import { addDays, fmtDay, quarterRange, todayStr, weekStart, weeksIn } from "../dates";
 import { breakdownGoal } from "../ai";
 import { celebrate, Empty, Modal } from "../ui";
@@ -472,13 +473,7 @@ function QuestEditor({ goal, onClose }: { goal: Goal | null; onClose: (newId?: s
       <div className="row wrap">
         <label className="grow">
           Life area
-          <select value={g.area} onChange={(e) => setG({ ...g, area: e.target.value as Area })}>
-            {AREAS.map((a) => (
-              <option key={a} value={a}>
-                {AREA_INFO[a].emoji} {AREA_INFO[a].label}
-              </option>
-            ))}
-          </select>
+          <AreaSelect value={g.area} onChange={(area) => setG({ ...g, area })} />
         </label>
         <label>
           Deadline (optional)

@@ -598,3 +598,8 @@ input:focus, select:focus, textarea:focus { outline: none; box-shadow: var(--glo
 .quest-mini { display: flex; gap: 10px; align-items: center; padding: 8px 4px; border-radius: 10px; cursor: pointer; }
 .quest-mini:hover { background: var(--accent-soft); }
 .quest-mini-hero { font-size: 1.5rem; }
+.area-editor { display: flex; flex-direction: column; gap: 6px; }
+.area-row { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+.area-emoji { font-size: 1.25rem; width: 42px; height: 38px; border-radius: 10px; border: 2px solid; background: rgb(8 8 16 / 0.6); cursor: pointer; }
+.area-used { min-width: 18px; text-align: right; }
+.area-emoji-pick { flex-basis: 100%; }
