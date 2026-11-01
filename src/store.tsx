@@ -28,6 +28,7 @@ const SEED_TAGS: Omit<Tag, "u">[] = [
   { id: "tag-social-media", name: "Social Media", emoji: "📱", color: "#ef4444", area: "fun", weeklyTargetMins: 0, archived: false },
   { id: "tag-commute", name: "Commute & Travel", emoji: "🚗", color: "#64748b", area: "home", weeklyTargetMins: 0, archived: false },
   { id: "tag-meditation", name: "Meditation & Prayer", emoji: "🧘", color: "#22c55e", area: "spirit", weeklyTargetMins: 0, archived: false },
+  { id: "tag-said-no", name: "I could have said NO", emoji: "🚫", color: "#f43f5e", area: "fun", weeklyTargetMins: 0, archived: false, wasted: true },
 ];
 
 export const DEFAULT_PREFS: Prefs = { id: "prefs", u: 1, name: "", dayStart: 6, dayEnd: 23, focusMins: 50, currentSeasonId: null, workoutTagId: "tag-workout" };
@@ -68,7 +69,10 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     (async () => {
       const saved = await get<{ data: Data; local: Local }>(STATE_KEY);
       const base = emptyData();
-      setData(saved?.data ? { ...base, ...saved.data } : seed(base));
+      const loaded = saved?.data ? { ...base, ...saved.data } : seed(base);
+      // Add tags introduced in later versions (fixed ids, so devices merge cleanly).
+      for (const t of SEED_TAGS) if (!loaded.tags[t.id] && t.id === "tag-said-no") loaded.tags[t.id] = { ...t, u: 1 };
+      setData(loaded);
       if (saved?.local) setLocalState({ ...defaultLocal, ...saved.local });
       // Ask the browser not to evict our data (important on iPhone).
       void navigator.storage?.persist?.();

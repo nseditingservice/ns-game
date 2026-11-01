@@ -339,7 +339,7 @@ export default function Calendar({ go }: { go: Go }) {
                     return dayEntries.map((x) => {
                       const t = tagMap.get(x.tagId);
                       return (
-                        <div key={x.id} className="cal-block did" style={{ ...blockStyle(x.start, x.end), ...laneStyle("did", lay.get(x.id)), background: t?.color ?? "#64748b" }} draggable={!mobile} onDragStart={(e) => { grab.current = e.clientY - e.currentTarget.getBoundingClientRect().top; e.dataTransfer.setData("text/plain", `entry:${x.id}`); }} onClick={() => setSel({ kind: "entry", item: x, isNew: false })}>
+                        <div key={x.id} className={`cal-block did ${(x.wasted ?? t?.wasted) ? "wasted" : ""}`} style={{ ...blockStyle(x.start, x.end), ...laneStyle("did", lay.get(x.id)), background: t?.color ?? "#64748b" }} draggable={!mobile} onDragStart={(e) => { grab.current = e.clientY - e.currentTarget.getBoundingClientRect().top; e.dataTransfer.setData("text/plain", `entry:${x.id}`); }} onClick={() => setSel({ kind: "entry", item: x, isNew: false })}>
                           <div className="cal-block-title">
                             {t?.emoji} {t?.name ?? "?"}
                           </div>

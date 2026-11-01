@@ -14,6 +14,7 @@ import { useTrophies } from "../achievements";
 import { fmtVal, questState } from "../quest";
 import { useSync } from "../sync";
 import { downloadBackup } from "../backup";
+import { WasteCard } from "../components/WasteCard";
 
 export default function Today({ go }: { go: Go }) {
   const { prefs, timer, put, data, local, setLocal } = useStore();
@@ -275,6 +276,8 @@ export default function Today({ go }: { go: Go }) {
           </p>
         )}
       </section>
+
+      <WasteCard go={go} />
 
       <div className="grid-2">
         <section className="card">

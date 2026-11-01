@@ -30,6 +30,8 @@ const linkLabel = (l: HabitLink, tagName: (id: string) => string) => {
       return `Auto: ${l.minHours}+ hours sleep`;
     case "weight":
       return "Auto: weight logged";
+    case "wasteLimit":
+      return `Auto: under ${l.maxMins} min of wasted time (judged at day's end)`;
   }
 };
 
@@ -46,6 +48,7 @@ const TEMPLATES: Template[] = [
   { name: "Log my meals", emoji: "🍽️", identity: "I know what I eat", anchor: "After each meal, I log it", tiny: "Log one meal", area: "body", days: EVERY, link: { kind: "meals", min: 3 } },
   { name: "Weigh in", emoji: "⚖️", identity: "I track my progress", anchor: "After using the bathroom in the morning", tiny: "Step on the scale", area: "body", days: EVERY, link: { kind: "weight" } },
   { name: "Plan tomorrow", emoji: "🗓️", identity: "I live on purpose", anchor: "After dinner, I open the calendar", tiny: "Write tomorrow's top task", area: "work", days: EVERY, link: { kind: "manual" } },
+  { name: "Say NO more", emoji: "🚫", identity: "I protect my time", anchor: "Before saying yes, I ask: does this serve my goals?", tiny: "Pause 5 seconds before every yes", area: "spirit", days: EVERY, link: { kind: "wasteLimit", maxMins: 60 } },
   { name: "Call family", emoji: "📞", identity: "I show up for people I love", anchor: "On my evening walk", tiny: "Send one message", area: "people", days: [5, 6], link: { kind: "manual" } },
 ];
 
@@ -321,6 +324,7 @@ function HabitEditor({ habit, onClose }: { habit: Habit; onClose: () => void }) 
                 water: { kind: "water", min: 10, liters: 2.5 },
                 sleep: { kind: "sleep", minHours: 7 },
                 weight: { kind: "weight" },
+                wasteLimit: { kind: "wasteLimit", maxMins: 60 },
               };
               setLink(defaults[k]);
             }}
@@ -334,6 +338,7 @@ function HabitEditor({ habit, onClose }: { habit: Habit; onClose: () => void }) 
             <option value="water">Auto: litres of water</option>
             <option value="sleep">Auto: hours of sleep</option>
             <option value="weight">Auto: weight logged</option>
+            <option value="wasteLimit">Auto: wasted time under a limit</option>
           </select>
         </label>
         {l.kind === "tag" && (
@@ -358,6 +363,12 @@ function HabitEditor({ habit, onClose }: { habit: Habit; onClose: () => void }) 
           <label>
             Min. minutes
             <input type="number" min={1} value={l.minMins} onChange={(e) => setLink({ ...l, minMins: num(e.target.value, 1) })} />
+          </label>
+        )}
+        {l.kind === "wasteLimit" && (
+          <label>
+            Max minutes wasted per day
+            <input type="number" min={0} step={15} value={l.maxMins} onChange={(e) => setLink({ ...l, maxMins: num(e.target.value, 60) })} />
           </label>
         )}
         {l.kind === "water" && (

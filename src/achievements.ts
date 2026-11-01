@@ -63,6 +63,17 @@ export function computeTrophies(d: Data, ix: Index, level: number): Trophy[] {
   const qx = questXp(d);
   const checkpoints = qx.filter((x) => x.label.startsWith("Checkpoint")).length;
   const bosses = qx.filter((x) => x.label.startsWith("Boss")).length;
+  // Essentialist: consecutive days (ending yesterday) with logging and wasted time under the limit.
+  const limit = (Object.values(d.meta).find((m) => m.id === "prefs") as { wasteLimitMins?: number } | undefined)?.wasteLimitMins ?? 60;
+  const wasteByDay = new Map<string, number>();
+  for (const e of entries) if (e.wasted ?? ix.tags.get(e.tagId)?.wasted) wasteByDay.set(e.date, (wasteByDay.get(e.date) ?? 0) + entryMins(e));
+  let underStreak = 0;
+  let bestUnder = 0;
+  for (const dd of [...days].sort()) {
+    const ok = (wasteByDay.get(dd) ?? 0) <= limit;
+    underStreak = ok && days.has(addDays(dd, -1)) ? underStreak + 1 : ok ? 1 : 0;
+    bestUnder = Math.max(bestUnder, underStreak);
+  }
   const T = (id: string, emoji: string, name: string, desc: string, tier: Trophy["tier"], value: number, target: number): Trophy => ({ id, emoji, name, desc, tier, value: Math.min(value, target), target });
   return [
     T("first-log", "🌱", "The First Step", "Log your first activity", "bronze", entries.length, 1),
@@ -90,6 +101,7 @@ export function computeTrophies(d: Data, ix: Index, level: number): Trophy[] {
     T("projects-5", "🗂️", "Many Hats", "Log time on 5 different projects", "bronze", projects, 5),
     T("tags-5x10", "🎭", "Renaissance Mind", "10+ hours on 5 different tags", "gold", tagsWith10h, 5),
     T("polymath", "🌌", "Polymath", `Log time in all ${AREAS.length} life areas in one week`, "mythic", maxAreas, AREAS.length),
+    T("essentialist", "✂️", "The Essentialist", "7 logged days in a row under your wasted-time limit", "silver", bestUnder, 7),
     T("quest-cp", "⛺", "Wayfarer", "Reach your first quest checkpoint", "bronze", checkpoints, 1),
     T("quest-boss", "🐲", "Dragonslayer", "Defeat a quest boss", "gold", bosses, 1),
     T("quest-boss-6", "⚔️", "Legend of the Realm", "Defeat 6 quest bosses", "mythic", bosses, 6),

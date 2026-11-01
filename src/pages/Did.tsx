@@ -3,7 +3,7 @@ import { AreaSelect, EditAreasButton } from "../components/Areas";
 import { PALETTE, uid, useList, useStore } from "../store";
 import { AREAS, AREA_INFO, type Area, type Entry, type Tag } from "../types";
 import { addDays, addMonths, dateRange, fmtDay, fmtHours, fmtTime, monthEnd, monthStart, todayStr, weekStart, yearEnd, yearStart } from "../dates";
-import { entryMins } from "../game";
+import { entryMins, isWasted } from "../game";
 import { Empty, Modal } from "../ui";
 import { EntryEditor } from "../components/EntryEditor";
 
@@ -63,6 +63,9 @@ export default function Did() {
   const byTag = sumBy(inRange);
   const prevByTag = sumBy(prev);
   const total = [...byTag.values()].reduce((a, b) => a + b, 0);
+  const tagWasted = (e: Entry) => isWasted(e, new Map(allTags.map((t) => [t.id, t])));
+  const wastedNow = inRange.filter(tagWasted).reduce((n, e) => n + entryMins(e), 0);
+  const wastedPrev = prev.filter(tagWasted).reduce((n, e) => n + entryMins(e), 0);
   const prevTotal = [...prevByTag.values()].reduce((a, b) => a + b, 0);
   const daysElapsed = Math.max(1, dateRange(from, to < todayStr() ? to : todayStr()).length);
   const tagMap = new Map(allTags.map((t) => [t.id, t]));
@@ -138,7 +141,7 @@ export default function Did() {
         <SearchResults query={query.trim()} entries={entries} tagMap={tagMap} onEdit={setEditEntry} />
       ) : (
         <>
-      <div className="grid-3">
+      <div className="grid-4">
         <div className="card stat">
           <div className="stat-num">{fmtHours(total)}</div>
           <div className="muted small">
@@ -149,9 +152,12 @@ export default function Did() {
           <div className="stat-num">{fmtHours(total / daysElapsed)}</div>
           <div className="muted small">per day</div>
         </div>
-        <div className="card stat">
-          <div className="stat-num">{inRange.length}</div>
-          <div className="muted small">entries</div>
+        <div className="card stat waste-stat">
+          <div className="stat-num">🚫 {fmtHours(wastedNow)}</div>
+          <div className="muted small">
+            could have said NO{total ? ` · ${Math.round((wastedNow / total) * 100)}%` : ""}
+            {period !== "all" && wastedPrev > 0 && <span className={wastedNow <= wastedPrev ? "up" : "down"}> {wastedNow <= wastedPrev ? "▼" : "▲"} {Math.abs(Math.round(((wastedNow - wastedPrev) / wastedPrev) * 100))}%</span>}
+          </div>
         </div>
       </div>
 
@@ -246,7 +252,10 @@ export default function Did() {
                 </span>
                 <div className="grow">
                   <div className="row between">
-                    <span className={t.archived ? "muted" : ""}>{t.name}</span>
+                    <span className={t.archived ? "muted" : ""}>
+                      {t.name}
+                      {t.wasted && <span className="wasted-badge">wasted</span>}
+                    </span>
                     <span>
                       <b>{fmtHours(m)}</b>
                       {d != null && m > 0 && <span className={`tiny ${d >= 0 ? "up" : "down"}`}> {d >= 0 ? "▲" : "▼"}{Math.abs(d)}%</span>}
@@ -430,6 +439,10 @@ function TagEditor({ tag, onClose }: { tag: Tag; onClose: () => void }) {
           <input type="color" value={t.color} onChange={(e) => setT({ ...t, color: e.target.value })} />
         </label>
       </div>
+      <label className="row said-no">
+        <input type="checkbox" checked={!!t.wasted} onChange={(e) => setT({ ...t, wasted: e.target.checked })} />
+        ⏳ Counts as wasted time (e.g. Social Media). Everything logged here shows in "Time I could have said NO to".
+      </label>
       <div className="row between">
         <button className="btn primary" disabled={!t.name.trim()} onClick={() => { put("tags", { ...t, name: t.name.trim() }); onClose(); }}>
           Save

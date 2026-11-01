@@ -50,6 +50,10 @@ export function useIndex(): Index {
 
 export const entryMins = (e: Entry) => Math.max(0, e.end - e.start);
 
+/** "I could have said NO": the entry's own flag wins, otherwise its tag decides. */
+export const isWasted = (e: Entry, tags: Map<string, Tag>) => e.wasted ?? tags.get(e.tagId)?.wasted ?? false;
+export const wastedMinsOn = (date: string, ix: Index) => (ix.entriesByDate.get(date) ?? []).filter((e) => isWasted(e, ix.tags)).reduce((n, e) => n + entryMins(e), 0);
+
 // ---------- Habits ----------
 
 export type HabitDayStatus = "done" | "skip" | "missed" | "pending" | "off";
@@ -81,6 +85,8 @@ export function autoProgress(h: Habit, date: string, ix: Index): { value: number
       return { value: hd?.sleepHours ?? 0, target: l.minHours, unit: "h sleep" };
     case "weight":
       return { value: hd?.weight != null ? 1 : 0, target: 1, unit: "weigh-in" };
+    case "wasteLimit":
+      return { value: wastedMinsOn(date, ix), target: l.maxMins, unit: "min wasted (max)" };
   }
 }
 
@@ -89,6 +95,11 @@ export function habitStatus(h: Habit, date: string, ix: Index, today = todayStr(
   const log = ix.logs.get(`${h.id}_${date}`);
   if (log?.status === "done") return "done";
   if (log?.status === "skip") return "skip";
+  if (h.link.kind === "wasteLimit" && log?.status !== "undone") {
+    // Judged when the day is over: done if you stayed at or under the limit.
+    if (date >= today) return "pending";
+    return wastedMinsOn(date, ix) <= h.link.maxMins ? "done" : "missed";
+  }
   if (log?.status !== "undone") {
     const p = autoProgress(h, date, ix);
     if (p && p.value >= p.target) return "done";

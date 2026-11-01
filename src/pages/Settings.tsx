@@ -86,6 +86,10 @@ export default function SettingsPage() {
           </label>
         </div>
         <label>
+          🚫 Daily limit for wasted time (minutes)
+          <input type="number" min={0} step={15} value={prefs.wasteLimitMins ?? 60} onChange={(e) => setPrefs({ wasteLimitMins: Math.max(0, Number(e.target.value) || 0) })} />
+        </label>
+        <label>
           Daily water goal (litres)
           <input type="number" min={0.5} step={0.25} value={prefs.waterGoalL ?? 3} onChange={(e) => setPrefs({ waterGoalL: Number(e.target.value) || 3 })} />
         </label>

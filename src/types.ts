@@ -6,6 +6,9 @@ export interface Rec {
   del?: boolean;
 }
 
+export const SAID_NO_TAG_ID = "tag-said-no";
+export const DEFAULT_WASTE_LIMIT = 60;
+
 // Life areas are user-editable (Settings → Life areas). These are the defaults.
 export type Area = string;
 export interface AreaDef {
@@ -151,6 +154,8 @@ export interface Tag extends Rec {
   area: Area;
   weeklyTargetMins: number; // 0 = no target
   archived: boolean;
+  /** Time on this tag counts as wasted ("I could have said NO"). */
+  wasted?: boolean;
 }
 
 /** Something you actually did (the "Did" lane). The core life log. */
@@ -165,6 +170,8 @@ export interface Entry extends Rec {
   workoutId?: string;
   /** What exactly: project / client / topic, e.g. "Zen Media House". */
   project?: string;
+  /** Per-entry override: true = "I could have said NO", false = not wasted. Undefined = follow the tag. */
+  wasted?: boolean;
 }
 
 export type HabitLink =
@@ -176,7 +183,8 @@ export type HabitLink =
   | { kind: "water"; min: number; liters?: number } // liters; old habits used glasses in `min`
   | { kind: "sleep"; minHours: number }
   | { kind: "focus"; minMins: number }
-  | { kind: "weight" };
+  | { kind: "weight" }
+  | { kind: "wasteLimit"; maxMins: number };
 
 export interface Habit extends Rec {
   name: string;
@@ -276,6 +284,7 @@ export interface Prefs extends Rec {
   accent?: string;
   waterGoalL?: number;
   areas?: AreaDef[];
+  wasteLimitMins?: number; // daily limit for wasted time
 }
 
 export interface WorkoutType {

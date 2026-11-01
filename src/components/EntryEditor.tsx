@@ -67,6 +67,8 @@ export function EntryEditor({ entry, isNew, onClose }: { entry: Entry; isNew: bo
   const { put, del } = useStore();
   const tags = useList("tags").filter((t) => !t.archived || t.id === entry.tagId);
   const [e, setE] = useState<Entry>({ ...entry, project: entry.project ?? "" });
+  const tagWasted = !!tags.find((t) => t.id === e.tagId)?.wasted;
+  const wasted = e.wasted ?? tagWasted;
   const valid = e.end > e.start;
   return (
     <Modal title={isNew ? "Log what I did" : "Edit log"} onClose={onClose}>
@@ -86,6 +88,10 @@ export function EntryEditor({ entry, isNew, onClose }: { entry: Entry; isNew: bo
         <input value={e.note} onChange={(ev) => setE({ ...e, note: ev.target.value })} placeholder="e.g. Video editing for client reel" />
       </label>
       <TimeFields date={e.date} start={e.start} end={e.end} onChange={(p) => setE({ ...e, ...p })} />
+      <label className="row said-no">
+        <input type="checkbox" checked={wasted} onChange={(ev) => setE({ ...e, wasted: ev.target.checked === tagWasted ? undefined : ev.target.checked })} />
+        🚫 I could have said NO (count as wasted time)
+      </label>
       {!valid && <p className="error small">End time must be after start time. For work past midnight, log the part after 00:00 on the next day.</p>}
       <div className="row between">
         <button className="btn primary" disabled={!valid} onClick={() => { put("entries", { ...e, project: e.project?.trim() || undefined }); onClose(); }}>

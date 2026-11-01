@@ -3,7 +3,7 @@ import { EditAreasButton } from "../components/Areas";
 import { useStore } from "../store";
 import { AREAS, AREA_INFO, type Area, type Review } from "../types";
 import { addDays, addMonths, dateRange, fmtDay, fmtHours, todayStr, weekStart } from "../dates";
-import { entryMins, habitStatus, isScheduled, levelFor, useIndex, useXp } from "../game";
+import { entryMins, habitStatus, isScheduled, isWasted, levelFor, useIndex, useXp } from "../game";
 import { coachReview } from "../ai";
 import { celebrate } from "../ui";
 
@@ -56,6 +56,7 @@ export default function ReviewPage() {
   const entries = days.flatMap((d) => ix.entriesByDate.get(d) ?? []);
   const logged = entries.reduce((n, e) => n + entryMins(e), 0);
   const focus = entries.filter((e) => e.source === "focus").reduce((n, e) => n + entryMins(e), 0);
+  const wastedW = entries.filter((e) => isWasted(e, ix.tags)).reduce((n, e) => n + entryMins(e), 0);
   const byTag = new Map<string, number>();
   entries.forEach((e) => byTag.set(e.tagId, (byTag.get(e.tagId) ?? 0) + entryMins(e)));
   const topTags = [...byTag.entries()].sort((a, b) => b[1] - a[1]).slice(0, 6);
@@ -81,7 +82,7 @@ export default function ReviewPage() {
     setErr("");
     const ctx = `Week of ${week}.
 Time logged: ${fmtHours(logged)} (${topTags.map(([t, m]) => `${ix.tags.get(t)?.name}: ${fmtHours(m)}`).join(", ") || "none"}).
-Focus: ${fmtHours(focus)}. Habits: ${doneH}/${sched} done (${ix.habits.map((h) => h.name).join(", ")}).
+Focus: ${fmtHours(focus)}. Wasted (could have said no): ${fmtHours(wastedW)}. Habits: ${doneH}/${sched} done (${ix.habits.map((h) => h.name).join(", ")}).
 Workouts: ${workouts.length}. Meals logged: ${meals.length}, healthy: ${healthy}. Avg sleep: ${sleepAvg.toFixed(1)}h.
 Tasks: ${tasks.filter((t) => t.done).length}/${tasks.length} done.
 Reflection — Wins: ${review.wins || "-"} | Challenges: ${review.challenges || "-"} | Lessons: ${review.lessons || "-"} | Next focus: ${review.nextFocus || "-"}`;
@@ -138,6 +139,7 @@ Reflection — Wins: ${review.wins || "-"} | Challenges: ${review.challenges || 
         {[
           ["⏱️", fmtHours(logged), "time logged"],
           ["🎯", fmtHours(focus), "focus"],
+          ["🚫", fmtHours(wastedW), "could have said NO"],
           ["✅", sched ? `${Math.round((doneH / sched) * 100)}%` : "–", "habits"],
           ["🏋️", String(workouts.length), "workouts"],
           ["🥗", meals.length ? `${Math.round((healthy / meals.length) * 100)}%` : "–", "healthy meals"],

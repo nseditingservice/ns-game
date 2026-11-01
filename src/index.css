@@ -603,3 +603,23 @@ input:focus, select:focus, textarea:focus { outline: none; box-shadow: var(--glo
 .area-emoji { font-size: 1.25rem; width: 42px; height: 38px; border-radius: 10px; border: 2px solid; background: rgb(8 8 16 / 0.6); cursor: pointer; }
 .area-used { min-width: 18px; text-align: right; }
 .area-emoji-pick { flex-basis: 100%; }
+/* Wasted time */
+.waste-card { border-color: rgb(244 63 94 / 0.28); background: linear-gradient(180deg, rgb(244 63 94 / 0.06), var(--panel) 55%); }
+.waste-today { display: flex; gap: 16px; align-items: center; }
+.waste-big { font-size: 2rem; font-weight: 800; letter-spacing: -0.03em; color: #fda4af; font-variant-numeric: tabular-nums; }
+.waste-big.over { color: #fb7185; text-shadow: 0 0 14px rgb(244 63 94 / 0.5); }
+.waste-bar { height: 10px; }
+.waste-stats { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; margin: 10px 0 6px; }
+.waste-stats div { display: flex; flex-direction: column; align-items: center; background: rgb(255 255 255 / 0.04); border-radius: 10px; padding: 8px 4px; }
+.waste-stats b { font-size: 1.05rem; color: #fecdd3; }
+.waste-stats span { font-size: 0.7rem; color: #b4b1cc; }
+.reality { background: rgb(244 63 94 / 0.08); border: 1px solid rgb(244 63 94 / 0.25); padding: 8px 10px; border-radius: 10px; }
+.reality b { color: #fecdd3; }
+.waste-actions { margin-top: 8px; }
+.cal-block.did.wasted { background-image: repeating-linear-gradient(135deg, rgb(0 0 0 / 0.28) 0 6px, transparent 6px 12px) !important; box-shadow: inset 0 0 0 2px #f43f5e; }
+.wasted-badge { font-size: 0.66rem; font-weight: 700; color: #fda4af; background: rgb(244 63 94 / 0.14); border: 1px solid rgb(244 63 94 / 0.35); padding: 1px 7px; border-radius: 99px; margin-left: 6px; }
+@media (max-width: 800px) { .waste-stats { grid-template-columns: repeat(2, 1fr); } .waste-big { font-size: 1.6rem; } }
+.grid-4 { display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; }
+@media (max-width: 800px) { .grid-4 { grid-template-columns: 1fr 1fr; gap: 8px; } }
+.waste-stat .stat-num { color: #fda4af; }
+.said-no { font-size: 0.86rem; color: #fecdd3 !important; gap: 8px; align-items: flex-start; }
