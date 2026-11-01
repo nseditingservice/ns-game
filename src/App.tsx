@@ -8,6 +8,7 @@ import { useTrophies } from "./achievements";
 import JournalPage from "./pages/Journal";
 import Trophies from "./pages/Trophies";
 import Atlas from "./pages/Atlas";
+import Tasks from "./pages/Tasks";
 import { useSync } from "./sync";
 import Today from "./pages/Today";
 import Calendar from "./pages/Calendar";
@@ -21,8 +22,9 @@ import SettingsPage from "./pages/Settings";
 
 export const NAV: { id: Page; label: string; icon: string; mobile?: boolean }[] = [
   { id: "today", label: "Today", icon: "☀️", mobile: true },
+  { id: "tasks", label: "Tasks", icon: "📋", mobile: true },
   { id: "calendar", label: "Calendar", icon: "📅", mobile: true },
-  { id: "did", label: "Things I Did", icon: "📊", mobile: true },
+  { id: "did", label: "Things I Did", icon: "📊" },
   { id: "habits", label: "Habits", icon: "✅", mobile: true },
   { id: "health", label: "Health", icon: "💪", mobile: true },
   { id: "goals", label: "Quests", icon: "🗺️" },
@@ -159,6 +161,7 @@ export default function App() {
         {page === "journal" && <JournalPage />}
         {page === "trophies" && <Trophies />}
         {page === "atlas" && <Atlas />}
+        {page === "tasks" && <Tasks go={go} />}
         {page === "settings" && <SettingsPage />}
         {page === "more" && <More go={go} />}
       </main>
@@ -167,10 +170,10 @@ export default function App() {
         {NAV.filter((n) => n.mobile).map((n) => (
           <button key={n.id} className={page === n.id ? "active" : ""} onClick={() => go(n.id)}>
             <span>{n.icon}</span>
-            <small>{n.id === "did" ? "I Did" : n.label}</small>
+            <small>{n.label}</small>
           </button>
         ))}
-        <button className={["goals", "atlas", "focus", "journal", "review", "trophies", "settings", "more"].includes(page) ? "active" : ""} onClick={() => go("more")}>
+        <button className={["did", "goals", "atlas", "focus", "journal", "review", "trophies", "settings", "more"].includes(page) ? "active" : ""} onClick={() => go("more")}>
           <span>☰</span>
           <small>More</small>
         </button>

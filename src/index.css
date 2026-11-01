@@ -623,3 +623,40 @@ input:focus, select:focus, textarea:focus { outline: none; box-shadow: var(--glo
 @media (max-width: 800px) { .grid-4 { grid-template-columns: 1fr 1fr; gap: 8px; } }
 .waste-stat .stat-num { color: #fda4af; }
 .said-no { font-size: 0.86rem; color: #fecdd3 !important; gap: 8px; align-items: flex-start; }
+
+/* =================== Tasks =================== */
+.task-tabs { flex-wrap: wrap; }
+.tab-count { margin-left: 6px; font-size: 0.7rem; background: var(--accent-soft); color: var(--text); padding: 0 6px; border-radius: 99px; }
+.quick-add { display: flex; flex-direction: column; gap: 6px; }
+.todo { display: flex; gap: 10px; align-items: flex-start; padding: 8px 4px; border-bottom: 1px solid var(--border); }
+.todo:last-child { border-bottom: 0; }
+.todo.frog { background: linear-gradient(90deg, rgb(52 211 153 / 0.10), transparent 70%); border-radius: 10px; }
+.todo-check { width: 24px; height: 24px; flex-shrink: 0; border-radius: 50%; border: 2px solid #8f8cab; background: transparent; cursor: pointer; color: #0b0b14; font-weight: 900; font-size: 0.8rem; margin-top: 1px; }
+.todo-check.prio-1 { border-color: #fb7185; background: rgb(251 113 133 / 0.12); }
+.todo-check.prio-2 { border-color: #fbbf24; background: rgb(251 191 36 / 0.10); }
+.todo-check.prio-3 { border-color: #60a5fa; background: rgb(96 165 250 / 0.10); }
+.todo.done .todo-check { background: #34d399; border-color: #34d399; }
+.todo.done .todo-title { text-decoration: line-through; color: var(--muted); }
+.todo-main { cursor: pointer; min-width: 0; }
+.todo-title { font-size: 0.95rem; line-height: 1.35; word-break: break-word; }
+.todo-meta { display: flex; flex-wrap: wrap; gap: 4px 10px; font-size: 0.74rem; color: #b4b1cc; margin-top: 2px; }
+.todo-meta .late { color: #fda4af; font-weight: 700; }
+.prio-text-1 { color: #fda4af; font-weight: 700; }
+.prio-text-2 { color: #fcd34d; font-weight: 700; }
+.prio-text-3 { color: #93c5fd; font-weight: 700; }
+.mini-chip.prio-1 { color: #fda4af; } .mini-chip.prio-2 { color: #fcd34d; } .mini-chip.prio-3 { color: #93c5fd; }
+.prio-btn.on.prio-1 { background: #fb7185; color: #0b0b14; } .prio-btn.on.prio-2 { background: #fbbf24; color: #0b0b14; } .prio-btn.on.prio-3 { background: #60a5fa; color: #0b0b14; }
+.todo-actions { display: flex; gap: 4px; flex-shrink: 0; }
+.icon-btn { width: 30px; height: 30px; border-radius: 9px; border: 1px solid var(--border); background: rgb(255 255 255 / 0.03); cursor: pointer; font-size: 0.85rem; color: var(--text); opacity: 0.55; }
+.icon-btn:hover, .icon-btn.on { opacity: 1; border-color: var(--accent); }
+.frog-badge { font-size: 0.64rem; font-weight: 800; letter-spacing: 0.06em; color: #0b0b14; background: #34d399; padding: 1px 6px; border-radius: 6px; margin-right: 6px; vertical-align: 1px; }
+.frog-hint { background: rgb(52 211 153 / 0.08); border: 1px solid rgb(52 211 153 / 0.3); border-radius: 10px; padding: 8px 10px; font-size: 0.88rem; }
+.frog-hint.done { color: #6ee7b7; }
+.overdue-card { border-color: rgb(251 113 133 / 0.35); }
+.upcoming-day.empty-day { opacity: 0.6; padding-top: 10px; padding-bottom: 10px; }
+.upcoming-day.empty-day .card-head { margin: 0; }
+.matrix { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+.quad-do { border-top: 3px solid #fb7185; } .quad-plan { border-top: 3px solid #34d399; } .quad-quick { border-top: 3px solid #fbbf24; } .quad-drop { border-top: 3px solid #8f8cab; }
+.task-title-input { font-size: 1.1rem; font-weight: 600; }
+.subtask { margin-bottom: 2px; }
+@media (max-width: 800px) { .matrix { grid-template-columns: 1fr; } }

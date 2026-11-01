@@ -162,6 +162,7 @@ export const XP_RULES = [
   ["Daily health check-in (sleep / weight / mood)", "+5"],
   ["Journal entry", "+10"],
   ["Task completed", "+10"],
+  ["🐸 Frog eaten (today's most important task)", "+15 more"],
   ["Goal achieved", "+200"],
   ["Weekly review written", "+50"],
   ["Monthly Wheel of Life rating", "+30"],
@@ -227,7 +228,11 @@ export function dayXp(date: string, ix: Index, today = todayStr()): XpDay {
 export function extraXpForDay(date: string, d: Data): XpItem[] {
   const goalArea = new Map(alive(d.goals).map((g) => [g.id, g.area]));
   const out: XpItem[] = [];
-  for (const t of alive(d.tasks)) if (t.done && t.doneAt && t.doneAt.slice(0, 10) === date) out.push({ label: `Task: ${t.title}`, xp: 10, area: (t.goalId && goalArea.get(t.goalId)) || "work" });
+  for (const t of alive(d.tasks)) {
+    if (!t.done || !t.doneAt || t.doneAt.slice(0, 10) !== date) continue;
+    out.push({ label: `Task: ${t.title}`, xp: 10, area: (t.goalId && goalArea.get(t.goalId)) || "work" });
+    if (t.frog === date) out.push({ label: `🐸 Frog eaten: ${t.title}`, xp: 15, area: (t.goalId && goalArea.get(t.goalId)) || "work" });
+  }
   for (const q of questXp(d)) if (q.date === date) out.push({ label: q.label, xp: q.xp, area: q.area });
   for (const x of polymathXp(d)) if (x.date === date) out.push({ label: x.label, xp: x.xp, area: x.area });
   return out;
@@ -252,7 +257,12 @@ export function totalXp(d: Data, ix: Index) {
     for (const [a, v] of Object.entries(x.byArea)) byArea[a] = (byArea[a] ?? 0) + v;
     if (x.items.length) history.push({ date, items: x.items });
   }
-  for (const t of alive(d.tasks)) if (t.done) oneOff(t.doneAt?.slice(0, 10) ?? t.week, { label: `Task: ${t.title}`, xp: 10, area: (t.goalId && goalArea.get(t.goalId)) || "work" });
+  for (const t of alive(d.tasks)) {
+    if (!t.done) continue;
+    const date = t.doneAt?.slice(0, 10) ?? t.week;
+    oneOff(date, { label: `Task: ${t.title}`, xp: 10, area: (t.goalId && goalArea.get(t.goalId)) || "work" });
+    if (t.frog && t.frog === date) oneOff(date, { label: `🐸 Frog eaten: ${t.title}`, xp: 15, area: (t.goalId && goalArea.get(t.goalId)) || "work" });
+  }
   for (const g of alive(d.goals)) if (g.done && !g.metric) oneOff(todayStr(), { label: `Goal achieved: ${g.title}`, xp: 200, area: g.area });
   for (const q of questXp(d)) oneOff(q.date, { label: q.label, xp: q.xp, area: q.area });
   for (const x of polymathXp(d)) oneOff(x.date, { label: x.label, xp: x.xp, area: x.area });

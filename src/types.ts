@@ -128,10 +128,20 @@ export interface LibraryItem extends Rec {
 export interface Task extends Rec {
   goalId: string | null;
   title: string;
-  week: string;
+  week: string; // Monday of the week it belongs to (derived from due date when set)
   estimateMins: number;
   done: boolean;
   doneAt?: string;
+  // ---- To-do features (all optional so older tasks keep working) ----
+  due?: string; // YYYY-MM-DD; none = Inbox
+  priority?: 1 | 2 | 3; // 1 = high
+  notes?: string;
+  subtasks?: { id: string; title: string; done: boolean }[];
+  repeat?: "day" | "weekday" | "week" | "month";
+  frog?: string; // date this task is the "frog" (most important task)
+  tagId?: string | null; // where focus time goes
+  project?: string;
+  createdAt?: string;
 }
 
 /** A planned block on the calendar (the "Plan" lane). */
@@ -340,4 +350,4 @@ export interface Local {
   dirty: string[]; // `${col}/${id}` waiting to upload
 }
 
-export type Page = "today" | "calendar" | "did" | "habits" | "health" | "goals" | "focus" | "review" | "journal" | "trophies" | "atlas" | "settings" | "more";
+export type Page = "today" | "calendar" | "did" | "habits" | "health" | "goals" | "focus" | "review" | "journal" | "trophies" | "atlas" | "tasks" | "settings" | "more";

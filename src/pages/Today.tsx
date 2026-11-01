@@ -1,16 +1,18 @@
 import { useState } from "react";
-import { uid, useList, useMap, useStore } from "../store";
+import { useList, useMap, useStore } from "../store";
 import type { Go } from "../App";
-import { fmtDay, fmtHours, fmtTime, nowMins, todayStr, weekStart } from "../dates";
+import { fmtDay, fmtHours, fmtTime, nowMins, todayStr } from "../dates";
 import { autoProgress, dayXp, entryMins, extraXpForDay, habitStatus, habitStreak, isScheduled, titleFor, useIndex, useXp } from "../game";
 import { useHabitToggle } from "../habitActions";
 import { timerDisplay, useNow } from "../focus";
 import { celebrate, Empty, Modal, useTimerActions } from "../ui";
-import { AREA_INFO, type HealthDay, type Task } from "../types";
+import { AREA_INFO, type HealthDay } from "../types";
 import { useDailyQuote } from "../useQuote";
 import { fmtL, waterMl } from "../water";
 import { ProjectInput } from "../components/EntryEditor";
 import { useTrophies } from "../achievements";
+import { QuickAdd, TaskRow } from "../components/TaskBits";
+import { isFrog, isOverdue, sortTasks } from "../tasks";
 import { fmtVal, questState } from "../quest";
 import { useSync } from "../sync";
 import { downloadBackup } from "../backup";
@@ -32,8 +34,6 @@ export default function Today({ go }: { go: Go }) {
   const trophies = useTrophies();
   const now = useNow(1000);
   const today = todayStr();
-  const week = weekStart(today);
-  const [newTask, setNewTask] = useState("");
   const [showXp, setShowXp] = useState(false);
   const [showHistory, setShowHistory] = useState(false);
   const { text: quote, author, credit } = useDailyQuote(today);
@@ -47,7 +47,6 @@ export default function Today({ go }: { go: Go }) {
   const tracked = entries.reduce((n, e) => n + entryMins(e), 0);
   const awake = Math.max(0, Math.min(nowMins(), prefs.dayEnd * 60) - prefs.dayStart * 60);
   const todayPlans = plans.filter((p) => p.date === today).sort((a, b) => a.start - b.start);
-  const weekTasks = tasks.filter((t) => t.week === week).sort((a, b) => Number(a.done) - Number(b.done));
   const hd = ix.health.get(today);
   const meals = ix.mealsByDate.get(today) ?? [];
   const workouts = ix.workoutsByDate.get(today) ?? [];
@@ -61,10 +60,6 @@ export default function Today({ go }: { go: Go }) {
   const hour = new Date().getHours();
   const greeting = hour < 5 ? "Burning the midnight oil" : hour < 12 ? "Good morning" : hour < 18 ? "Good afternoon" : "Good evening";
 
-  const toggleTask = (t: Task) => {
-    put("tasks", { ...t, done: !t.done, doneAt: !t.done ? new Date().toISOString() : undefined });
-    if (!t.done) celebrate("Task done +10 XP", "✅");
-  };
   const blank: HealthDay = { id: today, u: 0, date: today, sleepHours: null, sleepQuality: null, weight: null, water: 0, steps: null, energy: null, mood: null, notes: "" };
   const addWater = (ml: number) => {
     const base = hd ?? blank;
@@ -376,44 +371,7 @@ export default function Today({ go }: { go: Go }) {
           </ul>
         </section>
 
-        <section className="card">
-          <div className="card-head">
-            <h2>This week's tasks</h2>
-            <span className="muted">
-              {weekTasks.filter((t) => t.done).length}/{weekTasks.length}
-            </span>
-          </div>
-          <ul className="list">
-            {weekTasks.map((t) => {
-              const g = t.goalId ? goals.get(t.goalId) : undefined;
-              return (
-                <li key={t.id} className={`task-row ${t.done ? "done" : ""}`}>
-                  <input type="checkbox" checked={t.done} onChange={() => toggleTask(t)} />
-                  <input className="inline grow" value={t.title} onChange={(e) => put("tasks", { ...t, title: e.target.value })} />
-                  {g && (
-                    <span className="tag" style={{ color: g.color }}>
-                      {g.title}
-                    </span>
-                  )}
-                </li>
-              );
-            })}
-          </ul>
-          <div className="row">
-            <input
-              className="grow"
-              placeholder="Quick add a task…"
-              value={newTask}
-              onChange={(e) => setNewTask(e.target.value)}
-              onKeyDown={(e) => {
-                if (e.key === "Enter" && newTask.trim()) {
-                  put("tasks", { id: uid(), goalId: null, title: newTask.trim(), week, estimateMins: 50, done: false });
-                  setNewTask("");
-                }
-              }}
-            />
-          </div>
-        </section>
+        <TodayTasks go={go} />
       </div>
 
       <div className="grid-2">
@@ -452,5 +410,36 @@ export default function Today({ go }: { go: Go }) {
         </section>
       </div>
     </div>
+  );
+}
+
+function TodayTasks({ go }: { go: Go }) {
+  const all = useList("tasks");
+  const today = todayStr();
+  const list = sortTasks(all.filter((t) => !t.done && (t.due === today || isOverdue(t, today) || isFrog(t, today))), today);
+  const doneToday = all.filter((t) => t.done && t.doneAt?.slice(0, 10) === today).length;
+  const frog = list.find((t) => isFrog(t, today));
+  return (
+    <section className="card">
+      <div className="card-head">
+        <h2>📋 Today's tasks</h2>
+        <button className="btn ghost small" onClick={() => go("tasks")}>
+          {doneToday ? `${doneToday} done · ` : ""}All tasks →
+        </button>
+      </div>
+      {!frog && list.length > 0 && <p className="muted tiny">🐸 Tap the frog on the one task that would make today a win.</p>}
+      {!list.length && <p className="muted small">Nothing due today.</p>}
+      <ul className="list">
+        {list.slice(0, 6).map((t) => (
+          <TaskRow key={t.id} t={t} go={go} />
+        ))}
+      </ul>
+      {list.length > 6 && (
+        <button className="btn ghost small" onClick={() => go("tasks")}>
+          +{list.length - 6} more
+        </button>
+      )}
+      <QuickAdd defaults={{ due: today }} placeholder="Add for today… e.g. Call client !1 ~15m" />
+    </section>
   );
 }
