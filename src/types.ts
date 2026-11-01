@@ -105,6 +105,17 @@ export interface Idea extends Rec {
   links: string[]; // other idea ids
 }
 
+/** An actionable idea ("Ideas" section): captured, then executed. */
+export interface Spark extends Rec {
+  text: string;
+  date: string; // captured
+  done: boolean; // executed
+  doneAt?: string; // YYYY-MM-DD executed
+  rating?: 1 | 2 | 3; // potential (simple ICE)
+  note?: string;
+  taskId?: string; // task created from this idea
+}
+
 /** Feynman-style favourite problem. */
 export interface Problem extends Rec {
   text: string;
@@ -335,10 +346,11 @@ export interface Data {
   ideas: Record<string, Idea>;
   problems: Record<string, Problem>;
   library: Record<string, LibraryItem>;
+  sparks: Record<string, Spark>;
   meta: Record<string, Prefs | Timer>;
 }
 export type Col = keyof Data;
-export const COLS: Col[] = ["seasons", "goals", "tasks", "plans", "tags", "entries", "habits", "habitLogs", "healthDays", "workouts", "meals", "reviews", "wheels", "journal", "goalLogs", "domains", "ideas", "problems", "library", "meta"];
+export const COLS: Col[] = ["seasons", "goals", "tasks", "plans", "tags", "entries", "habits", "habitLogs", "healthDays", "workouts", "meals", "reviews", "wheels", "journal", "goalLogs", "domains", "ideas", "problems", "library", "sparks", "meta"];
 export type ItemOf<C extends Col> = Data[C][string];
 
 /** Device-only settings (never synced). */
@@ -350,4 +362,4 @@ export interface Local {
   dirty: string[]; // `${col}/${id}` waiting to upload
 }
 
-export type Page = "today" | "calendar" | "did" | "habits" | "health" | "goals" | "focus" | "review" | "journal" | "trophies" | "atlas" | "tasks" | "settings" | "more";
+export type Page = "today" | "calendar" | "did" | "habits" | "health" | "goals" | "focus" | "review" | "journal" | "trophies" | "atlas" | "tasks" | "ideas" | "settings" | "more";

@@ -660,3 +660,36 @@ input:focus, select:focus, textarea:focus { outline: none; box-shadow: var(--glo
 .task-title-input { font-size: 1.1rem; font-weight: 600; }
 .subtask { margin-bottom: 2px; }
 @media (max-width: 800px) { .matrix { grid-template-columns: 1fr; } }
+
+/* Compact quote on Today */
+.quote-line { margin: 6px 0 0; font-size: 0.84rem; font-style: italic; color: #cfcde4; max-width: 760px; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+.quote-line .muted, .quote-line .quote-credit { font-style: normal; font-size: 0.74rem; }
+
+/* =================== Ideas =================== */
+.idea-capture input { font-size: 1.02rem; }
+.month-tabs { display: grid; grid-template-columns: repeat(13, minmax(0, 1fr)); gap: 4px; margin: 12px 0; }
+.month-tab { font: inherit; cursor: pointer; display: flex; flex-direction: column; align-items: center; gap: 1px; padding: 6px 2px; border-radius: 10px; border: 1px solid var(--border); background: rgb(255 255 255 / 0.03); color: var(--text); }
+.month-tab b { font-size: 0.78rem; }
+.month-tab span { font-size: 0.72rem; color: #b4b1cc; font-variant-numeric: tabular-nums; }
+.month-tab .month-done { color: #6ee7b7; font-weight: 700; }
+.month-tab.on { border-color: var(--accent); background: var(--accent-soft); box-shadow: var(--glow); }
+.month-tab.future { opacity: 0.4; }
+.idea-stats { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+.idea-stats div { display: flex; flex-direction: column; align-items: center; background: rgb(255 255 255 / 0.04); border-radius: 10px; padding: 10px 4px; text-align: center; }
+.idea-stats b { font-size: 1.25rem; }
+.idea-stats span { font-size: 0.72rem; color: #b4b1cc; }
+.idea-row { display: flex; gap: 10px; align-items: flex-start; padding: 10px 4px; border-bottom: 1px solid var(--border); }
+.idea-row.done .idea-text { text-decoration: line-through; color: var(--muted); }
+.idea-row.done .todo-check { background: #34d399; border-color: #34d399; }
+.idea-date { font-size: 0.7rem; color: #8f8cab; letter-spacing: 0.02em; }
+.idea-exec { color: #6ee7b7; font-weight: 600; }
+.idea-task { color: #93c5fd; }
+.idea-text { cursor: pointer; margin-top: 2px; line-height: 1.45; white-space: pre-wrap; word-break: break-word; }
+.idea-body { min-width: 0; }
+.idea-actions { display: flex; gap: 6px; align-items: center; flex-shrink: 0; }
+.stars button { all: unset; cursor: pointer; font-size: 1rem; color: rgb(255 255 255 / 0.18); padding: 0 1px; }
+.stars button.on { color: #fcd34d; }
+@media (max-width: 800px) {
+  .month-tabs { grid-template-columns: repeat(7, minmax(0, 1fr)); }
+  .idea-stats b { font-size: 1.05rem; }
+}

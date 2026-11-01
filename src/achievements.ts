@@ -101,6 +101,8 @@ export function computeTrophies(d: Data, ix: Index, level: number): Trophy[] {
     T("projects-5", "🗂️", "Many Hats", "Log time on 5 different projects", "bronze", projects, 5),
     T("tags-5x10", "🎭", "Renaissance Mind", "10+ hours on 5 different tags", "gold", tagsWith10h, 5),
     T("polymath", "🌌", "Polymath", `Log time in all ${AREAS.length} life areas in one week`, "mythic", maxAreas, AREAS.length),
+    T("ideas-exec-10", "💡", "Idea to Action", "Execute 10 of your ideas", "silver", alive(d.sparks).filter((s) => s.done).length, 10),
+    T("ideas-100", "🧪", "Idea Machine", "Capture 100 ideas", "gold", alive(d.sparks).length, 100),
     T("frog-10", "🐸", "Frog Eater", "Eat 10 frogs (most important task first)", "silver", alive(d.tasks).filter((t) => t.done && t.frog && t.frog === t.doneAt?.slice(0, 10)).length, 10),
     T("tasks-100", "☑️", "Finisher", "Complete 100 tasks", "gold", alive(d.tasks).filter((t) => t.done).length, 100),
     T("essentialist", "✂️", "The Essentialist", "7 logged days in a row under your wasted-time limit", "silver", bestUnder, 7),

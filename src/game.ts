@@ -162,6 +162,7 @@ export const XP_RULES = [
   ["Daily health check-in (sleep / weight / mood)", "+5"],
   ["Journal entry", "+10"],
   ["Task completed", "+10"],
+  ["💡 Idea captured / executed", "+2 / +20"],
   ["🐸 Frog eaten (today's most important task)", "+15 more"],
   ["Goal achieved", "+200"],
   ["Weekly review written", "+50"],
@@ -309,5 +310,9 @@ export function polymathXp(d: Data): { date: string; label: string; xp: number; 
     if (i.domainIds.length >= 2 || i.links.length) out.push({ date: i.date, label: "Cross-pollination: idea connects fields", xp: 5, area: "mind" });
   }
   for (const b of alive(d.library ?? {})) if (b.status === "done" && b.finishedAt) out.push({ date: b.finishedAt, label: `Finished: ${b.title}`, xp: 20, area: "mind" });
+  for (const s of alive(d.sparks ?? {})) {
+    out.push({ date: s.date, label: "💡 Idea captured", xp: 2, area: "mind" });
+    if (s.done && s.doneAt) out.push({ date: s.doneAt, label: `💡 Idea executed: ${s.text.slice(0, 40)}`, xp: 20, area: "work" });
+  }
   return out;
 }
