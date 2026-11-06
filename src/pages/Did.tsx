@@ -6,6 +6,8 @@ import { addDays, addMonths, dateRange, fmtDay, fmtHours, fmtTime, monthEnd, mon
 import { entryMins, isWasted } from "../game";
 import { Empty, Modal } from "../ui";
 import { EntryEditor } from "../components/EntryEditor";
+import { ThingsEditor } from "../components/Things";
+import { thingIcon, thingKey, useThings } from "../v2";
 
 type Period = "day" | "week" | "month" | "year" | "all";
 
@@ -44,7 +46,22 @@ const sumBy = (es: Entry[]) => {
   return m;
 };
 
+function Delta({ now, prev }: { now: number; prev: number }) {
+  if (!prev && !now) return null;
+  if (!prev) return <div className="small up">new</div>;
+  const d = now - prev;
+  if (Math.abs(d) < 1) return <div className="small muted">= same</div>;
+  return (
+    <div className={`small ${d > 0 ? "up" : "down"}`}>
+      {d > 0 ? "▲" : "▼"} {fmtHours(Math.abs(d))}
+    </div>
+  );
+}
+
 export default function Did() {
+  const { prefs } = useStore();
+  const things = useThings();
+  const [editThings, setEditThings] = useState(false);
   const allTags = useList("tags");
   const entries = useList("entries");
   const [period, setPeriod] = useState<Period>("week");
@@ -66,8 +83,6 @@ export default function Did() {
   const tagWasted = (e: Entry) => isWasted(e, new Map(allTags.map((t) => [t.id, t])));
   const wastedNow = inRange.filter(tagWasted).reduce((n, e) => n + entryMins(e), 0);
   const wastedPrev = prev.filter(tagWasted).reduce((n, e) => n + entryMins(e), 0);
-  const prevTotal = [...prevByTag.values()].reduce((a, b) => a + b, 0);
-  const daysElapsed = Math.max(1, dateRange(from, to < todayStr() ? to : todayStr()).length);
   const tagMap = new Map(allTags.map((t) => [t.id, t]));
   const rows = allTags
     .filter((t) => byTag.has(t.id) || (!t.archived && period !== "all") || showArchived)
@@ -94,7 +109,28 @@ export default function Did() {
   });
   const maxBucket = Math.max(60, ...bucketData.map((b) => b.total));
   const pct = (a: number, b: number) => (b ? Math.round(((a - b) / b) * 100) : null);
-  const totalDelta = pct(total, prevTotal);
+  // Top 4 Things: where your real (non-wasted) hours went, by Thing, falling back to the tag.
+  const keyOf = (e: Entry) => (prefs.top4By !== "tags" && e.project?.trim() ? e.project.trim() : tagMap.get(e.tagId)?.name ?? "Other");
+  const iconOf = (e: Entry) => (prefs.top4By !== "tags" && e.project?.trim() ? thingIcon(e.project, things) : tagMap.get(e.tagId)?.emoji ?? "🗂️");
+  const hidden = new Set((prefs.top4Hidden ?? []).map(thingKey));
+  const agg = (es: Entry[]) => {
+    const m = new Map<string, { name: string; icon: string; mins: number }>();
+    for (const e of es) {
+      if (tagWasted(e)) continue;
+      const name = keyOf(e);
+      const k = thingKey(name);
+      if (hidden.has(k)) continue;
+      const cur = m.get(k) ?? { name, icon: iconOf(e), mins: 0 };
+      cur.mins += entryMins(e);
+      m.set(k, cur);
+    }
+    return m;
+  };
+  const prevAgg = agg(prev);
+  const top4 = [...agg(inRange).entries()]
+    .sort((a, b) => b[1].mins - a[1].mins)
+    .slice(0, 4)
+    .map(([key, v]) => ({ key, ...v, prev: prevAgg.get(key)?.mins ?? 0 }));
 
   return (
     <div className="page">
@@ -129,7 +165,7 @@ export default function Did() {
 
       <div className="search-bar">
         <span>🔍</span>
-        <input type="text" placeholder="Search projects, notes or tags… e.g. Zen Media House" value={query} onChange={(e) => setQuery(e.target.value)} />
+        <input type="text" placeholder="Search Things, notes or tags… e.g. Zen Media House" value={query} onChange={(e) => setQuery(e.target.value)} />
         {query && (
           <button className="btn ghost small" onClick={() => setQuery("")}>
             ✕
@@ -141,19 +177,25 @@ export default function Did() {
         <SearchResults query={query.trim()} entries={entries} tagMap={tagMap} onEdit={setEditEntry} />
       ) : (
         <>
-      <div className="grid-4">
-        <div className="card stat">
-          <div className="stat-num">{fmtHours(total)}</div>
-          <div className="muted small">
-            logged{totalDelta != null && <span className={totalDelta >= 0 ? "up" : "down"}> {totalDelta >= 0 ? "▲" : "▼"} {Math.abs(totalDelta)}%</span>}
+      <div className="grid-5">
+        {top4.map((t, i) => (
+          <button key={t.key} className="card stat top4" onClick={() => setQuery(t.name)} title={`Search ${t.name}`}>
+            <div className="muted tiny">
+              #{i + 1} {t.icon}
+            </div>
+            <div className="stat-num">{fmtHours(t.mins)}</div>
+            <div className="small top4-name">{t.name}</div>
+            {period !== "all" && <Delta now={t.mins} prev={t.prev} />}
+          </button>
+        ))}
+        {!top4.length && (
+          <div className="card stat top4-empty muted small">
+            Your Top 4 Things appear here once you log time. Add a Thing (e.g. Zen Media House) to a time entry, or it uses the tag.
           </div>
-        </div>
-        <div className="card stat">
-          <div className="stat-num">{fmtHours(total / daysElapsed)}</div>
-          <div className="muted small">per day</div>
-        </div>
+        )}
         <div className="card stat waste-stat">
-          <div className="stat-num">🚫 {fmtHours(wastedNow)}</div>
+          <div className="muted tiny">🚫</div>
+          <div className="stat-num">{fmtHours(wastedNow)}</div>
           <div className="muted small">
             could have said NO{total ? ` · ${Math.round((wastedNow / total) * 100)}%` : ""}
             {period !== "all" && wastedPrev > 0 && <span className={wastedNow <= wastedPrev ? "up" : "down"}> {wastedNow <= wastedPrev ? "▼" : "▲"} {Math.abs(Math.round(((wastedNow - wastedPrev) / wastedPrev) * 100))}%</span>}
@@ -208,10 +250,15 @@ export default function Did() {
         if (!top.length) return null;
         return (
           <section className="card">
-            <h2>Top projects</h2>
+            <div className="card-head">
+              <h2>Things</h2>
+              <button className="btn ghost small" onClick={() => setEditThings(true)}>
+                ✎ Edit Things
+              </button>
+            </div>
             {top.map(([p, m]) => (
               <div key={p} className="did-row" onClick={() => setQuery(p)}>
-                <span className="did-emoji">🗂️</span>
+                <span className="did-emoji">{thingIcon(p, things)}</span>
                 <div className="grow">
                   <div className="row between">
                     <span>{p}</span>
@@ -278,6 +325,7 @@ export default function Did() {
       {editEntry && <EntryEditor entry={editEntry} isNew={false} onClose={() => setEditEntry(null)} />}
       {detail && <TagDetail tag={tagMap.get(detail.id) ?? detail} entries={entries.filter((e) => e.tagId === detail.id)} onEditEntry={setEditEntry} onClose={() => setDetail(null)} onEdit={() => { setEditing(tagMap.get(detail.id) ?? detail); setDetail(null); }} />}
       {editing && <TagEditor tag={editing} onClose={() => setEditing(null)} />}
+      {editThings && <ThingsEditor onClose={() => setEditThings(false)} />}
     </div>
   );
 }
@@ -312,7 +360,7 @@ function TagDetail({ tag, entries, onClose, onEdit, onEditEntry }: { tag: Tag; e
   const recent = showAll ? sorted : sorted.slice(0, 15);
   const byProject = new Map<string, number>();
   for (const e of entries) {
-    const p = e.project?.trim() || "(no project)";
+    const p = e.project?.trim() || "(no Thing)";
     byProject.set(p, (byProject.get(p) ?? 0) + entryMins(e));
   }
   const projectRows = [...byProject.entries()].sort((a, b) => b[1] - a[1]);
@@ -373,12 +421,12 @@ function TagDetail({ tag, entries, onClose, onEdit, onEditEntry }: { tag: Tag; e
           <div key={d} className={`heat l${level(perDay.get(d) ?? 0)}`} style={{ ["--c" as string]: tag.color }} title={`${d}: ${fmtHours(perDay.get(d) ?? 0)}`} />
         ))}
       </div>
-      {projectRows.length > 1 || (projectRows[0] && projectRows[0][0] !== "(no project)") ? (
+      {projectRows.length > 1 || (projectRows[0] && projectRows[0][0] !== "(no Thing)") ? (
         <>
-          <h3>By project (all time)</h3>
+          <h3>By Thing (all time)</h3>
           {projectRows.map(([p, m]) => (
             <div key={p} className="row between small">
-              <span className={p === "(no project)" ? "muted" : ""}>{p}</span>
+              <span className={p === "(no Thing)" ? "muted" : ""}>{p}</span>
               <b>{fmtHours(m)}</b>
             </div>
           ))}
@@ -492,7 +540,7 @@ function SearchResults({ query, entries, tagMap, onEdit }: { query: string; entr
   const byTag = sumBy(hits);
   const byProject = new Map<string, number>();
   for (const e of hits) {
-    const p = e.project?.trim() || "(no project)";
+    const p = e.project?.trim() || "(no Thing)";
     byProject.set(p, (byProject.get(p) ?? 0) + entryMins(e));
   }
   const days = new Set(hits.map((e) => e.date));
@@ -504,7 +552,7 @@ function SearchResults({ query, entries, tagMap, onEdit }: { query: string; entr
   const maxM = Math.max(60, ...perMonth.map((x) => x.mins));
   const shown = showAll ? hits : hits.slice(0, 30);
 
-  if (!hits.length) return <section className="card"><Empty>Nothing found for “{query}”. Search looks in projects, notes and tag names.</Empty></section>;
+  if (!hits.length) return <section className="card"><Empty>Nothing found for “{query}”. Search looks in Things, notes and tag names.</Empty></section>;
   return (
     <>
       <section className="card search-summary">
@@ -553,10 +601,10 @@ function SearchResults({ query, entries, tagMap, onEdit }: { query: string; entr
               <b>{fmtHours(m)}</b>
             </div>
           ))}
-          <h3>By project</h3>
+          <h3>By Thing</h3>
           {[...byProject.entries()].sort((a, b) => b[1] - a[1]).map(([p, m]) => (
             <div key={p} className="row between small">
-              <span className={p === "(no project)" ? "muted" : ""}>{p}</span>
+              <span className={p === "(no Thing)" ? "muted" : ""}>{p}</span>
               <b>{fmtHours(m)}</b>
             </div>
           ))}

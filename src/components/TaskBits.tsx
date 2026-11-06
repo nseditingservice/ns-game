@@ -6,6 +6,7 @@ import { entryMins } from "../game";
 import { dueLabel, isFrog, isOverdue, parseQuick, newTask, useTaskActions } from "../tasks";
 import { celebrate, Modal, useTimerActions } from "../ui";
 import { ProjectInput } from "./EntryEditor";
+import { estimatesOf, fmtEstimate, parseEstimate, thingIcon, useThings } from "../v2";
 import type { Go } from "../App";
 
 const P_LABEL = { 1: "P1", 2: "P2", 3: "P3" } as const;
@@ -13,6 +14,7 @@ const P_LABEL = { 1: "P1", 2: "P2", 3: "P3" } as const;
 /** One-line capture: "Edit reel tomorrow !1 ~2h #Zen Media House" */
 export function QuickAdd({ defaults, placeholder }: { defaults?: Partial<Task>; placeholder?: string }) {
   const { put } = useStore();
+  const things = useThings();
   const [text, setText] = useState("");
   const preview = text.trim() ? parseQuick(text) : null;
   const add = () => {
@@ -42,7 +44,7 @@ export function QuickAdd({ defaults, placeholder }: { defaults?: Partial<Task>; 
           {preview.due && <span className="mini-chip static">📅 {dueLabel({ due: preview.due } as Task)}</span>}
           {preview.priority && <span className={`mini-chip static prio-${preview.priority}`}>{P_LABEL[preview.priority]}</span>}
           {preview.estimateMins && <span className="mini-chip static">⏱ {fmtHours(preview.estimateMins)}</span>}
-          {preview.project && <span className="mini-chip static">🗂️ {preview.project}</span>}
+          {preview.project && <span className="mini-chip static">{thingIcon(preview.project, things)} {preview.project}</span>}
         </div>
       )}
     </div>
@@ -51,6 +53,7 @@ export function QuickAdd({ defaults, placeholder }: { defaults?: Partial<Task>; 
 
 export function TaskRow({ t, go, showDue = true }: { t: Task; go?: Go; showDue?: boolean }) {
   const { timer } = useStore();
+  const things = useThings();
   const goals = useMap("goals");
   const entries = useList("entries");
   const act = useTaskActions();
@@ -77,7 +80,7 @@ export function TaskRow({ t, go, showDue = true }: { t: Task; go?: Go; showDue?:
           {t.repeat && <span>🔁 {t.repeat === "day" ? "daily" : t.repeat === "weekday" ? "weekdays" : t.repeat === "week" ? "weekly" : "monthly"}</span>}
           {(t.estimateMins || spent > 0) && <span>⏱ {spent ? `${fmtHours(spent)} / ` : ""}{fmtHours(t.estimateMins)}</span>}
           {subs.length > 0 && <span>☑ {subs.filter((s) => s.done).length}/{subs.length}</span>}
-          {t.project && <span>🗂️ {t.project}</span>}
+          {t.project && <span>{thingIcon(t.project, things)} {t.project}</span>}
           {g && <span style={{ color: g.color }}>{g.hero ?? "🗺️"} {g.title}</span>}
           {t.notes && <span>📝</span>}
         </div>
@@ -151,13 +154,7 @@ export function TaskEditor({ task, onClose }: { task: Task; onClose: () => void 
         </label>
         <label>
           Estimate
-          <select value={t.estimateMins} onChange={(e) => setT({ ...t, estimateMins: Number(e.target.value) })}>
-            {[...new Set([5, 15, 30, 45, 60, 90, 120, 180, 240, t.estimateMins])].sort((a, b) => a - b).map((m) => (
-              <option key={m} value={m}>
-                {fmtHours(m)}
-              </option>
-            ))}
-          </select>
+          <EstimateInput value={t.estimateMins} onChange={(m) => setT({ ...t, estimateMins: m })} />
         </label>
         <label>
           Repeat
@@ -214,7 +211,7 @@ export function TaskEditor({ task, onClose }: { task: Task; onClose: () => void 
         </label>
       </div>
       <label>
-        Project / client
+        Thing
         <ProjectInput value={t.project ?? ""} onChange={(project) => setT({ ...t, project: project || undefined })} />
       </label>
       {spent > 0 && <p className="muted small">⏱ {fmtHours(spent)} spent so far across {entries.length} session(s).</p>}
@@ -229,5 +226,35 @@ export function TaskEditor({ task, onClose }: { task: Task; onClose: () => void 
         )}
       </div>
     </Modal>
+  );
+}
+
+/** Type any duration ("6h30", "90", "2d") or tap a quick pick (editable in Settings). */
+export function EstimateInput({ value, onChange }: { value: number; onChange: (mins: number) => void }) {
+  const { prefs } = useStore();
+  const [text, setText] = useState(fmtEstimate(value));
+  const parsed = parseEstimate(text);
+  return (
+    <span className="estimate-input">
+      <input
+        value={text}
+        placeholder="e.g. 6h30"
+        style={{ width: 100 }}
+        onChange={(e) => {
+          setText(e.target.value);
+          const m = parseEstimate(e.target.value);
+          if (m) onChange(m);
+        }}
+        onBlur={() => setText(fmtEstimate(parseEstimate(text) ?? value))}
+      />
+      {text && !parsed && <span className="warn-text tiny"> try 45m, 2h, 6h30, 2d</span>}
+      <span className="chip-row">
+        {estimatesOf(prefs).map((m) => (
+          <button key={m} type="button" className={`mini-chip ${value === m ? "on" : ""}`} onClick={() => { onChange(m); setText(fmtEstimate(m)); }}>
+            {fmtEstimate(m)}
+          </button>
+        ))}
+      </span>
+    </span>
   );
 }

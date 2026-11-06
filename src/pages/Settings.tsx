@@ -6,6 +6,9 @@ import { parseConfig, useSync } from "../sync";
 import { BUILT_IN_FIREBASE_CONFIG } from "../config";
 import { XP_RULES } from "../game";
 import { downloadBackup } from "../backup";
+import { get } from "idb-keyval";
+import { BACKUP_V1_KEY } from "../store";
+import { GameSettings } from "../components/GameSettings";
 
 const ACCENTS: [string, string][] = [
   ["Arcane", "#a78bfa"],
@@ -216,8 +219,21 @@ export default function SettingsPage() {
             Import backup
           </button>
           <input ref={fileRef} type="file" accept="application/json" hidden onChange={(e) => e.target.files?.[0] && void importData(e.target.files[0])} />
+          <button
+            className="btn ghost"
+            title="The copy of your data saved automatically the first time version 2.0 opened"
+            onClick={async () => {
+              const snap = await get<{ at: number; data: Data }>(BACKUP_V1_KEY);
+              if (!snap) return alert("No pre-2.0 snapshot on this device (it is only made on a device that had data before the update).");
+              downloadBackup(snap.data, `ns-game-before-2.0-${new Date(snap.at).toISOString().slice(0, 10)}.json`);
+            }}
+          >
+            ⏪ Download pre-2.0 snapshot
+          </button>
         </div>
       </section>
+
+      <GameSettings />
 
       <section className="card">
         <h2>🎮 How XP works</h2>

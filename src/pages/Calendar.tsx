@@ -6,6 +6,7 @@ import { addDays, fmtDay, fmtHours, fmtTime, nowMins, todayStr, weekStart } from
 import { planWeek } from "../ai";
 import { celebrate, Modal, useTimerActions } from "../ui";
 import { EntryEditor, ProjectInput, TimeFields } from "../components/EntryEditor";
+import { thingIcon, useThings } from "../v2";
 
 const HOUR_PX = 44;
 const SNAP = 15;
@@ -57,6 +58,7 @@ function useIsMobile() {
 
 export default function Calendar({ go }: { go: Go }) {
   const { prefs, put, putMany, del, local } = useStore();
+  const things = useThings();
   const tags = useList("tags").filter((t) => !t.archived);
   const tagMap = useMap("tags");
   const goals = useMap("goals");
@@ -239,7 +241,7 @@ export default function Calendar({ go }: { go: Go }) {
           </div>
           {(!mobile || armed) && (
             <label className="small muted">
-              Project for new logs (optional)
+              Thing for new logs (optional)
               <ProjectInput value={project} onChange={setProject} tagId={armed?.id} />
             </label>
           )}
@@ -343,7 +345,7 @@ export default function Calendar({ go }: { go: Go }) {
                           <div className="cal-block-title">
                             {t?.emoji} {t?.name ?? "?"}
                           </div>
-                          {x.project && <div className="cal-block-time">{x.project}</div>}
+                          {x.project && <div className="cal-block-time">{thingIcon(x.project, things)} {x.project}</div>}
                           <div className="cal-block-time">
                             {fmtTime(x.start)}–{fmtTime(x.end)}
                             {x.note ? ` · ${x.note}` : ""}

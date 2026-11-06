@@ -218,6 +218,10 @@ export interface Habit extends Rec {
   link: HabitLink;
   archived: boolean;
   createdAt: string; // YYYY-MM-DD
+  /** Hard Mode: missing it costs XP. */
+  mustDo?: boolean;
+  /** Date must-do was switched on (penalties only count from here). */
+  mustDoSince?: string;
 }
 
 /** id = `${habitId}_${date}` */
@@ -306,6 +310,67 @@ export interface Prefs extends Rec {
   waterGoalL?: number;
   areas?: AreaDef[];
   wasteLimitMins?: number; // daily limit for wasted time
+  // ---- NS Game 2.0 (all optional: older data keeps working) ----
+  mustDoPenalty?: number; // XP lost per missed must-do habit (default 40)
+  dashCards?: { id: string; hidden: boolean }[];
+  pillars?: PillarDef[];
+  proteinTarget?: number; // grams per day
+  proteinFoods?: { emoji: string; label: string; grams: number }[];
+  muscles?: string[];
+  exerciseMuscles?: Record<string, string>; // lower-case exercise name → muscle
+  setsTarget?: number; // hard sets per muscle per week
+  estimatePresets?: number[]; // minutes
+  top4By?: "things" | "tags";
+  top4Hidden?: string[];
+  urgeTriggers?: string[];
+}
+
+export interface PillarDef {
+  id: string;
+  label: string;
+  emoji: string;
+  color: string;
+  source: "body" | "mind" | "quest";
+  questId?: string;
+}
+
+/** Looks for a "Thing" (what used to be called a project). Keyed by name; entries keep storing the name. */
+export interface Thing extends Rec {
+  name: string;
+  emoji: string;
+  color: string;
+  archived?: boolean;
+}
+
+/** A bad habit you're fighting. */
+export interface Battle extends Rec {
+  name: string;
+  emoji: string;
+  kind: "quit" | "reduce";
+  tagIds: string[]; // reduce: time on these tags counts toward the weekly limit
+  weeklyLimitMins: number;
+  replacement: string;
+  friction: { id: string; text: string; done: boolean }[];
+  startDate: string;
+  archived: boolean;
+}
+
+/** An urge (or a moment you reacted instead of responding). */
+export interface Urge extends Rec {
+  date: string;
+  at: number; // epoch ms
+  kind: "urge" | "reacted";
+  battleId: string | null;
+  intensity: number | null;
+  trigger: string;
+  outcome: "surfed" | "gave" | null;
+  note: string;
+}
+
+/** The vision board picture. id = "board" */
+export interface Vision extends Rec {
+  image: string; // data URL (JPEG)
+  title: string;
 }
 
 export interface WorkoutType {
@@ -347,10 +412,14 @@ export interface Data {
   problems: Record<string, Problem>;
   library: Record<string, LibraryItem>;
   sparks: Record<string, Spark>;
+  things: Record<string, Thing>;
+  battles: Record<string, Battle>;
+  urges: Record<string, Urge>;
+  vision: Record<string, Vision>;
   meta: Record<string, Prefs | Timer>;
 }
 export type Col = keyof Data;
-export const COLS: Col[] = ["seasons", "goals", "tasks", "plans", "tags", "entries", "habits", "habitLogs", "healthDays", "workouts", "meals", "reviews", "wheels", "journal", "goalLogs", "domains", "ideas", "problems", "library", "sparks", "meta"];
+export const COLS: Col[] = ["seasons", "goals", "tasks", "plans", "tags", "entries", "habits", "habitLogs", "healthDays", "workouts", "meals", "reviews", "wheels", "journal", "goalLogs", "domains", "ideas", "problems", "library", "sparks", "things", "battles", "urges", "vision", "meta"];
 export type ItemOf<C extends Col> = Data[C][string];
 
 /** Device-only settings (never synced). */

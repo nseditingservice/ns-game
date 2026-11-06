@@ -1,8 +1,8 @@
-import { useState } from "react";
+import { Fragment, useState, type ReactNode } from "react";
 import { useList, useStore } from "../store";
 import type { Go } from "../App";
 import { fmtDay, fmtHours, nowMins, todayStr } from "../dates";
-import { autoProgress, dayXp, entryMins, extraXpForDay, habitStatus, habitStreak, isScheduled, titleFor, useIndex, useXp } from "../game";
+import { autoProgress, dayXp, entryMins, wastedMinsOn, extraXpForDay, habitStatus, habitStreak, isScheduled, titleFor, useIndex, useXp } from "../game";
 import { useHabitToggle } from "../habitActions";
 import { timerDisplay, useNow } from "../focus";
 import { celebrate, Empty, Modal, useTimerActions } from "../ui";
@@ -15,6 +15,9 @@ import { fmtVal, questState } from "../quest";
 import { useSync } from "../sync";
 import { downloadBackup } from "../backup";
 import { WasteCard } from "../components/WasteCard";
+import { MindCheckCard } from "../components/MindCheck";
+import { CustomizeDash, PillarsBar, VisionCard } from "../components/Dashboard";
+import { dashLayout } from "../v2";
 
 export default function Today({ go }: { go: Go }) {
   const { prefs, timer, put, data, local, setLocal } = useStore();
@@ -31,6 +34,7 @@ export default function Today({ go }: { go: Go }) {
   const today = todayStr();
   const [showXp, setShowXp] = useState(false);
   const [showHistory, setShowHistory] = useState(false);
+  const [showCustomize, setShowCustomize] = useState(false);
   const { text: quote, author, credit } = useDailyQuote(today);
 
   const xpToday = dayXp(today, ix);
@@ -44,6 +48,7 @@ export default function Today({ go }: { go: Go }) {
   const tasksDoneToday = tasks.filter((t) => t.done && t.doneAt?.slice(0, 10) === today).length;
   const focusToday = entries.filter((e) => e.source === "focus").reduce((n, e) => n + entryMins(e), 0);
   const journal = ix.journal.get(today);
+  const wastedToday = wastedMinsOn(today, ix);
 
   const tagUse = new Map<string, number>();
   for (const e of Object.values(data.entries)) if (!e.del) tagUse.set(e.tagId, (tagUse.get(e.tagId) ?? 0) + 1);
@@ -54,25 +59,8 @@ export default function Today({ go }: { go: Go }) {
 
   const setJournal = (learned: string) => put("journal", { id: today, date: today, learned, grateful: journal?.grateful ?? "", thoughts: journal?.thoughts ?? "" });
 
-  return (
-    <div className="page">
-      <header className="page-head">
-        <div>
-          <h1>
-            {greeting}
-            {prefs.name ? `, ${prefs.name}` : ""}
-          </h1>
-          <p className="muted">{fmtDay(today, { weekday: "long", day: "numeric", month: "long" })}</p>
-          <p className="quote-line" title={author}>
-            “{quote}” <span className="muted">— {author}</span>
-            {credit && (
-              <a className="quote-credit" href={credit.href} target="_blank" rel="noreferrer">
-                {" "}· via {credit.text}
-              </a>
-            )}
-          </p>
-        </div>
-      </header>
+  const cards: Record<string, ReactNode> = {
+    hero: (
       <section className="card hero">
         <div className="hero-level">
           <div className="level-ring">{xp.lvl.level}</div>
@@ -82,7 +70,7 @@ export default function Today({ go }: { go: Go }) {
                 Level {xp.lvl.level} · {titleFor(xp.lvl.level)}
               </strong>
               <button className="xp-today" onClick={() => setShowXp(!showXp)}>
-                +{xpTodayTotal} XP today {showXp ? "▴" : "▾"}
+                {xpTodayTotal >= 0 ? "+" : ""}{xpTodayTotal} XP today {showXp ? "▴" : "▾"}
               </button>
             </div>
             <div className="bar xp">
@@ -104,7 +92,7 @@ export default function Today({ go }: { go: Go }) {
                 <span>
                   {AREA_INFO[i.area].emoji} {i.label}
                 </span>
-                <b>+{i.xp}</b>
+                <b className={i.xp < 0 ? "neg-xp" : ""}>{i.xp > 0 ? "+" : ""}{i.xp}</b>
               </div>
             ))}
           </div>
@@ -116,9 +104,9 @@ export default function Today({ go }: { go: Go }) {
             </b>
             <span>habits</span>
           </div>
-          <div>
-            <b>{fmtHours(tracked)}</b>
-            <span>logged</span>
+          <div className="said-no-stat">
+            <b>{fmtHours(wastedToday)}</b>
+            <span>said NO today</span>
           </div>
           <div>
             <b>{tasksDoneToday}</b>
@@ -129,49 +117,12 @@ export default function Today({ go }: { go: Go }) {
             <span>focus</span>
           </div>
         </div>
+        <PillarsBar />
       </section>
 
-      {showHistory && (
-        <Modal title={`XP history · ${xp.total.toLocaleString("en-US")} XP`} onClose={() => setShowHistory(false)}>
-          <p className="muted small">Every point you've earned, newest first. XP is calculated from your log, so if you delete or change something, its XP changes too.</p>
-          {!xp.log.length && <Empty>No XP yet. Complete a habit or log something to start.</Empty>}
-          {xp.log.slice(0, 120).map((d) => (
-            <div key={d.date} className="xp-day">
-              <div className="row between">
-                <b>{d.date === today ? "Today" : fmtDay(d.date, { weekday: "short", day: "numeric", month: "short", year: "numeric" })}</b>
-                <b className="accent-text">+{d.total}</b>
-              </div>
-              {d.items.map((i, k) => (
-                <div key={k} className="xp-line">
-                  <span>
-                    {AREA_INFO[i.area].emoji} {i.label}
-                  </span>
-                  <span>+{i.xp}</span>
-                </div>
-              ))}
-            </div>
-          ))}
-        </Modal>
-      )}
-
-      {!sync.email && (!local.lastBackup || Date.now() - local.lastBackup > 30 * 864e5) && Object.keys(data.entries).length + Object.keys(data.goalLogs ?? {}).length > 5 && (
-        <section className="card backup-nudge">
-          <span>
-            💾 <b>Protect your progress.</b> <span className="muted small">Cloud sync is off and you haven't saved a backup in 30 days.</span>
-          </span>
-          <span className="row">
-            <button className="btn small primary" onClick={() => { downloadBackup(data); setLocal({ lastBackup: Date.now() }); }}>
-              Download backup
-            </button>
-            <button className="btn small ghost" onClick={() => go("settings")}>
-              Turn on sync
-            </button>
-          </span>
-        </section>
-      )}
-
-      <div className="grid-2">
-        <TodayTasks go={go} />
+    ),
+    tasks: <TodayTasks go={go} />,
+    habits: (
         <section className="card">
           <div className="card-head">
             <h2>Today's habits</h2>
@@ -203,8 +154,8 @@ export default function Today({ go }: { go: Go }) {
             })}
           </ul>
         </section>
-      </div>
-
+    ),
+    now: (
       <section className="card">
         <div className="card-head">
           <h2>What are you doing now?</h2>
@@ -220,7 +171,7 @@ export default function Today({ go }: { go: Go }) {
                 {timer.tagId && ix.tags.get(timer.tagId)?.emoji} {timer.label}
               </div>
               <label className="small muted project-field">
-                Project / client
+                Thing
                 <ProjectInput value={timer.project ?? ""} onChange={(project) => put("meta", { ...timer, project })} tagId={timer.tagId ?? undefined} />
               </label>
             </div>
@@ -256,6 +207,9 @@ export default function Today({ go }: { go: Go }) {
         )}
       </section>
 
+    ),
+    quests: quests.length > 0 ? (
+      <>
       {quests.length > 0 && (
         <section className="card">
           <div className="card-head">
@@ -290,8 +244,12 @@ export default function Today({ go }: { go: Go }) {
         </section>
       )}
 
-      <WasteCard go={go} />
-
+      </>
+    ) : null,
+    waste: <WasteCard go={go} />,
+    mind: <MindCheckCard />,
+    vision: <VisionCard />,
+    learn: (
       <section className="card">
         <div className="card-head">
           <h2>🖋️ What did I learn today?</h2>
@@ -301,6 +259,86 @@ export default function Today({ go }: { go: Go }) {
         </div>
         <textarea rows={3} placeholder="One idea, lesson or insight from today… (+10 XP)" value={journal?.learned ?? ""} onChange={(e) => setJournal(e.target.value)} />
       </section>
+    ),
+  };
+  const layout = dashLayout(prefs).filter((c) => !c.hidden && cards[c.id]);
+
+  return (
+    <div className="page">
+      <header className="page-head">
+        <div>
+          <h1>
+            {greeting}
+            {prefs.name ? `, ${prefs.name}` : ""}
+          </h1>
+          <p className="muted">{fmtDay(today, { weekday: "long", day: "numeric", month: "long" })}</p>
+          <p className="quote-line" title={author}>
+            “{quote}” <span className="muted">— {author}</span>
+            {credit && (
+              <a className="quote-credit" href={credit.href} target="_blank" rel="noreferrer">
+                {" "}· via {credit.text}
+              </a>
+            )}
+          </p>
+        </div>
+        <button className="dash-gear" title="Customize dashboard" aria-label="Customize dashboard" onClick={() => setShowCustomize(true)}>
+          ⚙
+        </button>
+      </header>
+      {!sync.email && (!local.lastBackup || Date.now() - local.lastBackup > 30 * 864e5) && Object.keys(data.entries).length + Object.keys(data.goalLogs ?? {}).length > 5 && (
+        <section className="card backup-nudge">
+          <span>
+            💾 <b>Protect your progress.</b> <span className="muted small">Cloud sync is off and you haven't saved a backup in 30 days.</span>
+          </span>
+          <span className="row">
+            <button className="btn small primary" onClick={() => { downloadBackup(data); setLocal({ lastBackup: Date.now() }); }}>
+              Download backup
+            </button>
+            <button className="btn small ghost" onClick={() => go("settings")}>
+              Turn on sync
+            </button>
+          </span>
+        </section>
+      )}
+      {layout.map((c, i) => {
+        // Tasks and habits sit side by side when they're next to each other.
+        const prev = layout[i - 1]?.id;
+        const next = layout[i + 1]?.id;
+        const pair = (a: string, b: string) => (c.id === a && next === b) || (c.id === b && next === a);
+        if (pair("tasks", "habits")) return (
+          <div key={c.id} className="grid-2">
+            {cards[c.id]}
+            {cards[next!]}
+          </div>
+        );
+        if ((c.id === "habits" && prev === "tasks") || (c.id === "tasks" && prev === "habits")) return null;
+        return <Fragment key={c.id}>{cards[c.id]}</Fragment>;
+      })}
+      {showCustomize && <CustomizeDash onClose={() => setShowCustomize(false)} />}
+      {showHistory && (
+        <Modal title={`XP history · ${xp.total.toLocaleString("en-US")} XP`} onClose={() => setShowHistory(false)}>
+          <p className="muted small">Every point you've earned, newest first. XP is calculated from your log, so if you delete or change something, its XP changes too.</p>
+          {!xp.log.length && <Empty>No XP yet. Complete a habit or log something to start.</Empty>}
+          {xp.log.slice(0, 120).map((d) => (
+            <div key={d.date} className="xp-day">
+              <div className="row between">
+                <b>{d.date === today ? "Today" : fmtDay(d.date, { weekday: "short", day: "numeric", month: "short", year: "numeric" })}</b>
+                <b className="accent-text">{d.total >= 0 ? "+" : ""}{d.total}</b>
+              </div>
+              {d.items.map((i, k) => (
+                <div key={k} className="xp-line">
+                  <span>
+                    {AREA_INFO[i.area].emoji} {i.label}
+                  </span>
+                  <span className={i.xp < 0 ? "neg-xp" : ""}>{i.xp > 0 ? "+" : ""}{i.xp}</span>
+                </div>
+              ))}
+            </div>
+          ))}
+        </Modal>
+      )}
+
+
     </div>
   );
 }

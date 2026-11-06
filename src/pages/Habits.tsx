@@ -7,6 +7,12 @@ import { useHabitToggle } from "../habitActions";
 import { Modal } from "../ui";
 import { AreaSelect } from "../components/Areas";
 import { waterTargetL } from "../water";
+import { Battles } from "./Battles";
+import { penaltyOf } from "../v2";
+
+/** Lally et al. (2010): a median of 66 days of repetition until a habit runs on autopilot. */
+export const AUTOMATIC_DAYS = 66;
+export const doneDays = (h: Habit, ix: Index, today = todayStr()) => dateRange(h.createdAt, today).filter((d) => habitStatus(h, d, ix, today) === "done").length;
 
 const DAY_NAMES = ["M", "T", "W", "T", "F", "S", "S"];
 
@@ -62,6 +68,11 @@ export default function Habits() {
   const [detail, setDetail] = useState<Habit | null>(null);
   const [showTips, setShowTips] = useState(false);
   const [showArchived, setShowArchived] = useState(false);
+  const [tab, setTab] = useState<"habits" | "battles">(() => (sessionStorage.getItem("nsgame:habitTab") === "battles" ? "battles" : "habits"));
+  const pickTab = (t: "habits" | "battles") => {
+    sessionStorage.setItem("nsgame:habitTab", t);
+    setTab(t);
+  };
   const today = todayStr();
   const last7 = dateRange(addDays(today, -6), today);
   const active = habits.filter((h) => !h.archived);
@@ -81,14 +92,31 @@ export default function Habits() {
           </p>
         </div>
         <div className="row">
-          <button className="btn ghost" onClick={() => setShowTips(!showTips)}>
-            How to win
-          </button>
-          <button className="btn primary" onClick={() => setEditing(blank())}>
-            + New habit
-          </button>
+          <div className="seg">
+            <button className={tab === "habits" ? "on" : ""} onClick={() => pickTab("habits")}>
+              ✅ Habits
+            </button>
+            <button className={tab === "battles" ? "on" : ""} onClick={() => pickTab("battles")}>
+              ⚔️ Battles
+            </button>
+          </div>
+          {tab === "habits" && (
+            <>
+              <button className="btn ghost" onClick={() => setShowTips(!showTips)}>
+                How to win
+              </button>
+              <button className="btn primary" onClick={() => setEditing(blank())}>
+                + New habit
+              </button>
+            </>
+          )}
         </div>
       </header>
+
+      {tab === "battles" ? (
+        <Battles />
+      ) : (
+      <>
 
       {showTips && (
         <section className="card tips">
@@ -102,6 +130,12 @@ export default function Habits() {
             </li>
             <li>
               <b>Anchor it.</b> "After I [existing routine], I will [habit]." <span className="muted">(habit stacking)</span>
+            </li>
+            <li>
+              <b>Must-do = Hard Mode.</b> Switch it on for your non-negotiables. Missing one costs XP (you set how much in Settings), so the game is honest about bad days.
+            </li>
+            <li>
+              <b>~66 days to autopilot.</b> In research, a new habit took a median of 66 days of repeats to feel automatic. The counter on each habit shows how far you are. <span className="muted">(Lally et al., 2010)</span>
             </li>
             <li>
               <b>Never miss twice.</b> One miss is an accident; your streak survives with a warning. Two in a row breaks it.
@@ -148,17 +182,24 @@ export default function Habits() {
           {shown.map((h) => {
             const { streak, warn } = habitStreak(h, ix);
             const p = autoProgress(h, today, ix);
+            const reps = doneDays(h, ix, today);
             return (
               <div key={h.id} className={`habit-grid-row ${h.archived ? "archived" : ""}`}>
                 <div className="habit-name" onClick={() => setDetail(h)}>
                   <span className="h-emoji">{h.emoji}</span>
                   <div>
                     <div>
-                      {h.name} {streak > 0 && <span className="streak">🔥{streak}</span>}
+                      {h.name} {h.mustDo && <span className="must-chip">must-do</span>} {streak > 0 && <span className="streak">🔥{streak}</span>}
                     </div>
                     <div className="muted tiny">
                       {warn ? <span className="warn-text">Missed last time. Don't miss twice! </span> : h.identity ? `“${h.identity}” ` : ""}
                       {p && habitStatus(h, today, ix) !== "done" && `· ${Math.round(p.value * 10) / 10}/${p.target} ${p.unit}`}
+                    </div>
+                    <div className="auto-meter" title="Days done so far. Around 66 repeats, a habit usually runs on autopilot.">
+                      <div className="bar thin">
+                        <div style={{ width: `${Math.min(100, (reps / AUTOMATIC_DAYS) * 100)}%` }} />
+                      </div>
+                      <span className="muted tiny">{reps >= AUTOMATIC_DAYS ? "🧠 automatic" : `🧠 ${reps}/${AUTOMATIC_DAYS} to automatic`}</span>
                     </div>
                   </div>
                 </div>
@@ -166,7 +207,7 @@ export default function Habits() {
                   const s = habitStatus(h, d, ix);
                   return (
                     <button key={d} className={`dot-btn ${s}`} disabled={s === "off"} onClick={() => toggle(h, d)} title={`${d}: ${s}`}>
-                      {s === "done" ? "✓" : s === "skip" ? "–" : s === "missed" ? "✕" : ""}
+                      {s === "done" ? "✓" : s === "skip" ? "–" : ""}
                     </button>
                   );
                 })}
@@ -197,6 +238,9 @@ export default function Habits() {
         </details>
       )}
 
+      </>
+      )}
+
       {editing && <HabitEditor habit={editing} onClose={() => setEditing(null)} />}
       {detail && <HabitDetail habit={habits.find((h) => h.id === detail.id) ?? detail} ix={ix} linkText={linkLabel(detail.link, tagName)} onClose={() => setDetail(null)} onEdit={() => { setEditing(detail); setDetail(null); }} />}
     </div>
@@ -204,8 +248,7 @@ export default function Habits() {
 }
 
 function HabitDetail({ habit: h, ix, linkText, onClose, onEdit }: { habit: Habit; ix: Index; linkText: string; onClose: () => void; onEdit: () => void }) {
-  const { del } = useStore();
-  const toggle = useHabitToggle(ix);
+  const { del, prefs } = useStore();
   const today = todayStr();
   const { streak } = habitStreak(h, ix);
   const best = bestStreak(h, ix);
@@ -220,6 +263,7 @@ function HabitDetail({ habit: h, ix, linkText, onClose, onEdit }: { habit: Habit
       <div className="muted small">
         {h.anchor && <div>⚓ {h.anchor}</div>}
         {h.tiny && <div>🌱 Tiny version: {h.tiny}</div>}
+        {h.mustDo && <div>⚔️ Must-do: missing it costs {penaltyOf(prefs)} XP</div>}
         <div>
           🔗 {linkText} · {AREA_INFO[h.area].emoji} {AREA_INFO[h.area].label} · {h.days.length === 7 ? "every day" : h.days.map((d) => ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"][d]).join(", ")}
         </div>
@@ -238,8 +282,8 @@ function HabitDetail({ habit: h, ix, linkText, onClose, onEdit }: { habit: Habit
           <span>last 30 days</span>
         </div>
         <div>
-          <b>{allDone}</b>
-          <span>votes for who you are</span>
+          <b>{Math.min(allDone, AUTOMATIC_DAYS)}/{AUTOMATIC_DAYS}</b>
+          <span>{allDone >= AUTOMATIC_DAYS ? "🧠 automatic" : "to automatic"}</span>
         </div>
       </div>
       <h3>Last 12 months</h3>
@@ -250,9 +294,6 @@ function HabitDetail({ habit: h, ix, linkText, onClose, onEdit }: { habit: Habit
         })}
       </div>
       <div className="row wrap">
-        <button className="btn" onClick={() => toggle(h, today, "skip")}>
-          Skip today (rest day)
-        </button>
         <button className="btn" onClick={onEdit}>
           Edit
         </button>
@@ -265,7 +306,7 @@ function HabitDetail({ habit: h, ix, linkText, onClose, onEdit }: { habit: Habit
 }
 
 function HabitEditor({ habit, onClose }: { habit: Habit; onClose: () => void }) {
-  const { put, data } = useStore();
+  const { put, data, prefs } = useStore();
   const tags = useList("tags").filter((t) => !t.archived);
   const [h, setH] = useState(habit);
   const isNew = !data.habits[habit.id] || data.habits[habit.id].del;
@@ -393,6 +434,13 @@ function HabitEditor({ habit, onClose }: { habit: Habit; onClose: () => void }) 
       <label>
         Life area
         <AreaSelect value={h.area} onChange={(area) => setH({ ...h, area })} />
+      </label>
+      <label className="row check-label">
+        <input type="checkbox" checked={!!h.mustDo} onChange={(e) => setH({ ...h, mustDo: e.target.checked, mustDoSince: e.target.checked ? (h.mustDoSince ?? todayStr()) : undefined })} />
+        <span>
+          ⚔️ <b>Must-do (Hard Mode)</b>
+          <span className="muted tiny"> · missing it costs {penaltyOf(prefs)} XP (change in Settings). Counts from today.</span>
+        </span>
       </label>
       <div className="row between">
         <button className="btn primary" disabled={!h.name.trim() || !h.days.length} onClick={() => { put("habits", { ...h, name: h.name.trim() }); onClose(); }}>

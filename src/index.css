@@ -699,3 +699,79 @@ input:focus, select:focus, textarea:focus { outline: none; box-shadow: var(--glo
 .waste-chip-x { all: unset; cursor: pointer; padding: 3px 9px; font-size: 0.75rem; color: #fda4af; }
 .waste-chip-x:hover { background: rgb(244 63 94 / 0.25); color: #fff; }
 .undo-btn { border-color: #fbbf24 !important; color: #fcd34d !important; }
+
+/* ================= NS Game 2.0 ================= */
+.chip { display: inline-flex; align-items: center; gap: 4px; font: inherit; font-size: 0.78rem; padding: 2px 9px; border-radius: 99px; background: var(--accent-soft); color: #c4b5fd; border: 1px solid transparent; cursor: default; }
+button.chip { cursor: pointer; }
+.chip.ok { background: rgb(52 211 153 / 0.16); color: #6ee7b7; }
+.chip.bad { background: rgb(244 63 94 / 0.16); color: #fda4af; }
+.neg-xp { color: #fb7185 !important; }
+.must-chip { font-size: 0.68rem; font-weight: 700; padding: 1px 7px; border-radius: 99px; background: rgb(251 191 36 / 0.16); color: #fcd34d; vertical-align: middle; }
+.auto-meter { display: flex; align-items: center; gap: 6px; margin-top: 3px; max-width: 260px; }
+.auto-meter .bar { flex: 1; }
+.auto-meter .bar > div { background: #818cf8; }
+.dot-btn.missed { background: var(--panel-2); border-color: var(--border); color: transparent; }
+.check-label { align-items: flex-start; gap: 8px; }
+.check-label input { margin-top: 3px; }
+.hero-stats .said-no-stat b { color: #fda4af; }
+
+/* dashboard */
+.page-head { position: relative; }
+.dash-gear { all: unset; cursor: pointer; position: absolute; top: 0; right: 0; font-size: 1rem; color: var(--muted); padding: 4px 6px; border-radius: 8px; line-height: 1; }
+.dash-gear:hover { color: var(--text); background: var(--accent-soft); }
+.pillars { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; margin-top: 10px; }
+.pillar .bar { margin-top: 4px; }
+.customize-list li { padding: 6px 0; border-bottom: 1px solid var(--border); }
+.customize-list label { gap: 8px; }
+.pillar-edit { gap: 6px; padding: 4px 0; }
+.pillar-edit input[type="color"] { width: 36px; height: 30px; padding: 0; border: 0; background: none; }
+
+/* vision board */
+.vision-mini { all: unset; cursor: pointer; display: flex; align-items: center; gap: 12px; width: 100%; }
+.vision-mini img { width: 110px; height: 62px; object-fit: cover; border-radius: 8px; border: 1px solid var(--border); }
+.vision-mini .grow { display: flex; flex-direction: column; }
+.lightbox { position: fixed; inset: 0; z-index: 200; background: rgb(0 0 0 / 0.86); display: grid; place-items: center; padding: 16px; padding-top: calc(16px + var(--safe-t)); }
+.lightbox-inner { width: min(1400px, 100%); display: flex; flex-direction: column; gap: 10px; }
+.lightbox-inner img { width: 100%; max-height: calc(100vh - 110px); object-fit: contain; border-radius: 12px; }
+.vision-title { width: 160px; }
+
+/* Things I Did: Top 4 */
+.grid-5 { display: grid; grid-template-columns: repeat(5, 1fr); gap: 12px; }
+.top4 { all: unset; box-sizing: border-box; cursor: pointer; background: var(--panel); border: 1px solid var(--border); border-radius: var(--radius); padding: 12px 10px; text-align: center; min-width: 0; }
+.top4:hover { border-color: var(--accent); }
+.top4-name { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.top4-empty { grid-column: span 4; display: grid; place-items: center; }
+@media (max-width: 800px) { .grid-5 { grid-template-columns: 1fr 1fr; gap: 8px; } .top4-empty { grid-column: span 2; } .grid-5 > .waste-stat { grid-column: span 2; } .pillars { gap: 8px; } }
+
+/* Things editor */
+.thing-row { padding: 8px 0; border-bottom: 1px solid var(--border); display: flex; flex-direction: column; gap: 4px; }
+.thing-row.archived { opacity: 0.55; }
+.thing-row input[type="color"] { width: 34px; height: 30px; padding: 0; border: 0; background: none; }
+.thing-icon { font-size: 1.2rem; width: 38px; height: 34px; border-radius: 9px; border: 2px solid; background: var(--panel-2); cursor: pointer; }
+.icon-grid { display: flex; flex-wrap: wrap; gap: 4px; }
+.icon-grid button { font-size: 1.1rem; width: 36px; height: 32px; border-radius: 8px; border: 1px solid var(--border); background: var(--panel-2); cursor: pointer; }
+.icon-grid button.sel { outline: 2px solid var(--accent); }
+
+/* Battles & urge surfing */
+.battle.archived { opacity: 0.6; }
+.mini-stats em { font-style: normal; font-size: 0.7rem; }
+.battle-bars { position: relative; }
+.limit-line { position: absolute; left: 0; right: 0; border-top: 2px dashed rgb(255 255 255 / 0.55); pointer-events: none; }
+.surf { display: flex; flex-direction: column; align-items: center; gap: 8px; text-align: center; padding: 6px 0; }
+.surf-orb { width: 120px; height: 120px; border-radius: 50%; display: grid; place-items: center; font-size: 1.6rem; font-weight: 800; font-variant-numeric: tabular-nums; background: radial-gradient(circle, rgb(56 189 248 / 0.45), rgb(56 189 248 / 0.08) 65%, transparent 72%); transition: transform 4s ease-in-out; }
+.surf-orb.in { transform: scale(1.12); }
+.surf-orb.out { transform: scale(0.88); transition-duration: 6s; }
+
+/* Health: training & protein */
+.muscle-row { margin: 5px 0; }
+.target-bar { position: relative; overflow: visible; }
+.target-bar i { position: absolute; top: -3px; bottom: -3px; width: 2px; background: rgb(255 255 255 / 0.7); }
+.pr-row { padding: 5px 0; border-bottom: 1px solid var(--border); }
+.protein-top { display: flex; gap: 14px; align-items: center; }
+.protein-ring { width: 96px; height: 96px; border-radius: 50%; display: grid; place-items: center; flex-shrink: 0; }
+.protein-ring span { width: 76px; height: 76px; border-radius: 50%; background: var(--panel); display: flex; flex-direction: column; align-items: center; justify-content: center; }
+.protein-ring b { font-size: 1.2rem; }
+.protein-ring small { font-size: 0.7rem; color: var(--muted); }
+@media (max-width: 600px) { .protein-top { flex-direction: column; align-items: stretch; } .protein-ring { margin: 0 auto; } }
+.estimate-input { display: flex; flex-direction: column; gap: 2px; }
+@media (max-width: 600px) { .pillar .row { flex-direction: column; align-items: flex-start; gap: 0; } .pillar .row b { font-size: 0.8rem; } }

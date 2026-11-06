@@ -7,6 +7,8 @@ export type DistOmit<T, K extends PropertyKey> = T extends unknown ? Omit<T, K> 
 // Data and device state (incl. the sync cursor) are saved together in ONE
 // write, so the sync cursor can never get ahead of the data it refers to.
 const STATE_KEY = "nsgame:state";
+/** Snapshot taken the first time version 2.0 opens (rollback safety net). */
+export const BACKUP_V1_KEY = "nsgame:backup-before-2.0";
 
 export const PALETTE = ["#6366f1", "#0ea5e9", "#10b981", "#f59e0b", "#ef4444", "#ec4899", "#8b5cf6", "#14b8a6", "#f97316", "#64748b"];
 
@@ -72,6 +74,8 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       const loaded = saved?.data ? { ...base, ...saved.data } : seed(base);
       // Add tags introduced in later versions (fixed ids, so devices merge cleanly).
       for (const t of SEED_TAGS) if (!loaded.tags[t.id] && t.id === "tag-said-no") loaded.tags[t.id] = { ...t, u: 1 };
+      // NS Game 2.0: keep an untouched copy of the data as it was before the first 2.0 launch.
+      if (saved?.data && !(await get(BACKUP_V1_KEY))) await set(BACKUP_V1_KEY, { at: Date.now(), data: saved.data });
       setData(loaded);
       if (saved?.local) setLocalState({ ...defaultLocal, ...saved.local });
       // Ask the browser not to evict our data (important on iPhone).

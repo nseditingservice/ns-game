@@ -70,7 +70,7 @@ export default function Focus() {
             <h2>{timer.label}</h2>
             {timer.tagId && <p style={{ color }}>{tagMap.get(timer.tagId)?.emoji} {tagMap.get(timer.tagId)?.name}</p>}
             <label className="small muted project-field">
-              Project / client
+              Thing
               <ProjectInput value={timer.project ?? ""} onChange={(p) => put("meta", { ...timer, project: p })} tagId={timer.tagId ?? undefined} />
             </label>
             <textarea rows={2} placeholder="Note: what did you get done?" value={note} onChange={(e) => setNote(e.target.value)} />
@@ -116,7 +116,7 @@ export default function Focus() {
               </select>
             </label>
             <label>
-              Project / client (optional)
+              Thing (optional)
               <ProjectInput value={project} onChange={setProject} tagId={tagId} />
             </label>
             {!taskId && (

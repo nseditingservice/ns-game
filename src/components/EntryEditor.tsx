@@ -3,6 +3,7 @@ import { useList, useStore } from "../store";
 import type { Entry } from "../types";
 import { fmtTime, parseTime } from "../dates";
 import { Modal } from "../ui";
+import { thingIcon, thingKey, useThings } from "../v2";
 
 /** Distinct projects you've used, most recent first (for autocomplete). */
 export function useProjects(tagId?: string) {
@@ -19,8 +20,10 @@ export function useProjects(tagId?: string) {
 }
 
 export function ProjectInput({ value, onChange, tagId, placeholder = "e.g. Zen Media House" }: { value: string; onChange: (v: string) => void; tagId?: string; placeholder?: string }) {
-  const forTag = useProjects(tagId);
-  const all = useProjects();
+  const things = useThings();
+  const live = (p: string) => !things.get(thingKey(p))?.archived;
+  const forTag = useProjects(tagId).filter(live);
+  const all = useProjects().filter(live);
   const options = [...new Set([...forTag, ...all])].slice(0, 50);
   const listId = useMemo(() => `projects-${Math.random().toString(36).slice(2)}`, []);
   return (
@@ -35,7 +38,7 @@ export function ProjectInput({ value, onChange, tagId, placeholder = "e.g. Zen M
         <div className="chip-row">
           {forTag.slice(0, 6).map((p) => (
             <button key={p} type="button" className="mini-chip" onClick={() => onChange(p)}>
-              {p}
+              {thingIcon(p, things)} {p}
             </button>
           ))}
         </div>
@@ -80,7 +83,7 @@ export function EntryEditor({ entry, isNew, onClose }: { entry: Entry; isNew: bo
         ))}
       </div>
       <label>
-        Project / client / topic
+        Thing (client, business, skill…)
         <ProjectInput value={e.project ?? ""} onChange={(project) => setE({ ...e, project })} tagId={e.tagId} />
       </label>
       <label>

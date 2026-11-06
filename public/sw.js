@@ -1,6 +1,6 @@
 // NS Game service worker: offline support.
 // Hashed build assets are immutable → cache-first. Pages → network-first.
-const CACHE = "nsgame-v2";
+const CACHE = "nsgame-v3";
 
 self.addEventListener("install", (e) => {
   e.waitUntil(caches.open(CACHE).then((c) => c.addAll(["./", "./index.html", "./manifest.webmanifest", "./favicon.svg", "./icon-192.png"])).catch(() => {}));

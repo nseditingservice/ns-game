@@ -181,7 +181,7 @@ function Constellation({ domains, entries, ideas }: { domains: Domain[]; entries
       {!domains.length ? (
         <section className="card">
           <h2>Map your fields</h2>
-          <p className="muted small">A domain is a field you're growing in: Video Editing, Philosophy, Muay Thai, Business… Each one takes its hours from the tags (and projects) you choose, and levels up through mastery tiers.</p>
+          <p className="muted small">A domain is a field you're growing in: Video Editing, Philosophy, Muay Thai, Business… Each one takes its hours from the tags (and Things) you choose, and levels up through mastery tiers.</p>
           <div className="row wrap">
             <button className="btn primary" onClick={() => setEditing(blankDomain(0))}>
               + Create a domain
@@ -303,7 +303,7 @@ function DomainEditor({ domain, onClose }: { domain: Domain; onClose: () => void
         </div>
       </div>
       <label>
-        …and from these projects (comma separated, optional)
+        …and from these Things (comma separated, optional)
         <input value={projects} onChange={(e) => setProjects(e.target.value)} placeholder="Zen Media House, Client reels" />
       </label>
       <div className="row between">

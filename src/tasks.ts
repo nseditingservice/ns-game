@@ -1,3 +1,4 @@
+import { parseEstimate } from "./v2";
 // To-do helpers: quick-capture parsing, ordering, repeats, completion.
 import { useStore, uid } from "./store";
 import { addDays, addMonths, fmtDay, todayStr, weekStart, weekdayIdx } from "./dates";
@@ -25,6 +26,7 @@ export function parseQuick(input: string, today = todayStr()) {
   };
   take(/\s#([^!~#]+?)(?=\s[!~]|\s(?:today|tomorrow|tmr|next week|in \d+ days?)\b|\s*$)/i, (m) => (project = m[1].trim()));
   take(/\s!([123])(?=\s)/, (m) => (priority = Number(m[1]) as 1 | 2 | 3));
+  take(/\s~(\d+h\d+m?|\d+(?:\.\d+)?d)(?=\s)/i, (m) => (estimateMins = parseEstimate(m[1]) ?? undefined));
   take(/\s~(\d+(?:\.\d+)?)\s*(m|min|mins|h|hr|hrs)?(?=\s)/i, (m) => (estimateMins = Math.round(Number(m[1]) * (/^h/i.test(m[2] ?? "") ? 60 : m[2] ? 1 : Number(m[1]) <= 8 ? 60 : 1))));
   take(/\s(today|tod)(?=\s)/i, () => (due = today));
   take(/\s(tomorrow|tmr|tmrw)(?=\s)/i, () => (due = addDays(today, 1)));

@@ -3,7 +3,8 @@
 // between devices.
 import { useMemo } from "react";
 import { useStore } from "./store";
-import { AREAS, type Area, type Data, type Entry, type Habit, type HabitLog, type HealthDay, type Journal, type Meal, type Tag, type Workout } from "./types";
+import { AREAS, type Area, type Data, type Entry, type Habit, type HabitLog, type HealthDay, type Journal, type Meal, type Prefs, type Tag, type Urge, type Workout } from "./types";
+import { penaltyOf } from "./v2";
 import { waterMl, waterTargetL } from "./water";
 import { questXp } from "./quest";
 import { addDays, todayStr, weekdayIdx } from "./dates";
@@ -17,6 +18,8 @@ export interface Index {
   habits: Habit[];
   tags: Map<string, Tag>;
   journal: Map<string, Journal>;
+  urgesByDate: Map<string, Urge[]>;
+  penalty: number;
 }
 
 function group<T extends { date: string }>(items: T[]): Map<string, T[]> {
@@ -40,6 +43,8 @@ export function buildIndex(d: Data): Index {
     habits: alive(d.habits).filter((h) => !h.archived),
     tags: new Map(alive(d.tags).map((t) => [t.id, t])),
     journal: new Map(alive(d.journal ?? {}).map((j) => [j.date, j])),
+    urgesByDate: group(alive(d.urges ?? {})),
+    penalty: penaltyOf((d.meta.prefs ?? {}) as Prefs),
   };
 }
 
@@ -154,6 +159,8 @@ export function bestStreak(h: Habit, ix: Index, today = todayStr()) {
 
 export const XP_RULES = [
   ["Habit completed", "+10"],
+  ["Missed must-do habit (Hard Mode, editable)", "−40"],
+  ["🌊 Urge surfed (max 5/day)", "+15"],
   ["Perfect day (all habits done)", "+20"],
   ["Every 15 min of time logged", "+1"],
   ["Every 5 min of focus session", "+1"],
@@ -186,8 +193,8 @@ const zeroAreas = () => Object.fromEntries(AREAS.map((a) => [a, 0])) as Record<A
 export function dayXp(date: string, ix: Index, today = todayStr()): XpDay {
   const byArea = zeroAreas();
   const items: XpItem[] = [];
-  const add = (area: Area, xp: number, label: string) => {
-    if (xp <= 0) return;
+  const add = (area: Area, xp: number, label: string, allowNegative = false) => {
+    if (xp <= 0 && !(allowNegative && xp < 0)) return;
     byArea[area] = (byArea[area] ?? 0) + xp;
     items.push({ label, xp, area });
   };
@@ -200,6 +207,8 @@ export function dayXp(date: string, ix: Index, today = todayStr()): XpDay {
       add(h.area, 10, `Habit: ${h.name}`);
       anyDone = true;
     } else if (s !== "skip") allDone = false;
+    // Hard Mode: a missed must-do habit costs XP (only for finished days, from the day it became must-do).
+    if (s === "missed" && h.mustDo && date < today && date >= (h.mustDoSince ?? h.createdAt) && ix.penalty > 0) add(h.area, -ix.penalty, `Missed must-do: ${h.name}`, true);
   }
   if (allDone && anyDone) add("spirit", 20, "Perfect day: all habits done");
   let tracked = 0;
@@ -220,6 +229,8 @@ export function dayXp(date: string, ix: Index, today = todayStr()): XpDay {
   for (const m of (ix.mealsByDate.get(date) ?? []).slice(0, 6)) add("body", m.quality === "great" ? 6 : 3, `Meal: ${m.what}`);
   const hd = ix.health.get(date);
   if (hd && (hd.sleepHours != null || hd.weight != null || hd.mood != null)) add("body", 5, "Health check-in");
+  const surfed = (ix.urgesByDate.get(date) ?? []).filter((u) => u.kind === "urge" && u.outcome === "surfed").length;
+  if (surfed) add("spirit", Math.min(surfed, 5) * 15, `🌊 Urges surfed (${surfed})`);
   const j = ix.journal.get(date);
   if (j && (j.learned || j.grateful || j.thoughts)) add("mind", 10, "Journal entry");
   return { total: Object.values(byArea).reduce((n, v) => n + v, 0), byArea, items };
@@ -242,7 +253,7 @@ export function extraXpForDay(date: string, d: Data): XpItem[] {
 export function totalXp(d: Data, ix: Index) {
   const goalArea = new Map(alive(d.goals).map((g) => [g.id, g.area]));
   const byArea = zeroAreas();
-  const dates = new Set<string>([...ix.entriesByDate.keys(), ...ix.mealsByDate.keys(), ...ix.workoutsByDate.keys(), ...ix.health.keys(), ...ix.journal.keys()]);
+  const dates = new Set<string>([...ix.entriesByDate.keys(), ...ix.mealsByDate.keys(), ...ix.workoutsByDate.keys(), ...ix.health.keys(), ...ix.journal.keys(), ...ix.urgesByDate.keys()]);
   for (const l of ix.logs.values()) dates.add(l.date);
   for (const h of ix.habits) for (let x = h.createdAt, i = 0; x <= todayStr() && i < 2000; x = addDays(x, 1), i++) dates.add(x);
   const perDay = new Map<string, number>();
@@ -298,7 +309,7 @@ export function useXp() {
   const ix = useIndex();
   return useMemo(() => {
     const x = totalXp(data, ix);
-    return { ...x, lvl: levelFor(x.total) };
+    return { ...x, lvl: levelFor(Math.max(0, x.total)) };
   }, [data, ix]);
 }
 

@@ -1,0 +1,220 @@
+// NS Game 2.0 helpers: defaults for everything the player can edit, plus
+// derived stats (training volume, PRs, protein, battles, Things).
+import { useMemo } from "react";
+import { useList, useStore } from "./store";
+import type { Battle, Entry, HealthDay, Meal, PillarDef, Prefs, Tag, Thing, Timer, Urge, Workout } from "./types";
+import { addDays, todayStr, weekStart } from "./dates";
+
+export const DEFAULT_PENALTY = 40;
+export const DEFAULT_MUSCLES = ["Chest", "Back", "Legs", "Shoulders", "Arms", "Core"];
+export const DEFAULT_SETS_TARGET = 10;
+export const DEFAULT_ESTIMATES = [15, 30, 60, 120, 240, 360, 480];
+export const DEFAULT_PROTEIN_FOODS = [
+  { emoji: "🥚", label: "3 eggs", grams: 18 },
+  { emoji: "🥛", label: "Whey scoop", grams: 24 },
+  { emoji: "🍗", label: "Chicken 150g", grams: 45 },
+  { emoji: "🧀", label: "Paneer 100g", grams: 18 },
+  { emoji: "🫘", label: "Dal bowl", grams: 12 },
+  { emoji: "🥣", label: "Greek yogurt", grams: 15 },
+  { emoji: "🐟", label: "Fish 150g", grams: 33 },
+  { emoji: "🌱", label: "Soya chunks 50g", grams: 26 },
+];
+export const DEFAULT_TRIGGERS = ["🌙 Late night", "😔 Lonely", "😩 Tired", "😤 Angry", "🍔 Hungry", "🥱 Bored", "🛏️ In bed", "📱 Notification", "😰 Stressed"];
+export const DEFAULT_PILLARS: PillarDef[] = [
+  { id: "body", label: "Body", emoji: "🥋", color: "#f43f5e", source: "body" },
+  { id: "wealth", label: "Wealth", emoji: "💰", color: "#fbbf24", source: "quest" },
+  { id: "mind", label: "Mind", emoji: "🧘", color: "#38bdf8", source: "mind" },
+];
+export const DASH_CARDS: { id: string; label: string }[] = [
+  { id: "hero", label: "Level, stats & pillars" },
+  { id: "tasks", label: "📋 Today's tasks" },
+  { id: "habits", label: "✅ Today's habits" },
+  { id: "now", label: "What are you doing now?" },
+  { id: "quests", label: "⚔️ Active quests" },
+  { id: "waste", label: "⏳ Time I could have said NO to" },
+  { id: "mind", label: "🧘 Mind check" },
+  { id: "vision", label: "🌌 Vision board" },
+  { id: "learn", label: "🖋️ What did I learn today?" },
+];
+
+/** Card order with any cards added in later versions appended. */
+export function dashLayout(prefs: Prefs) {
+  const saved = (prefs.dashCards ?? []).filter((c) => DASH_CARDS.some((d) => d.id === c.id));
+  for (const d of DASH_CARDS) if (!saved.some((c) => c.id === d.id)) saved.push({ id: d.id, hidden: false });
+  return saved;
+}
+
+export const penaltyOf = (p: Prefs) => p.mustDoPenalty ?? DEFAULT_PENALTY;
+export const musclesOf = (p: Prefs) => (p.muscles?.length ? p.muscles : DEFAULT_MUSCLES);
+export const estimatesOf = (p: Prefs) => (p.estimatePresets?.length ? p.estimatePresets : DEFAULT_ESTIMATES);
+export const foodsOf = (p: Prefs) => p.proteinFoods ?? DEFAULT_PROTEIN_FOODS;
+export const triggersOf = (p: Prefs) => (p.urgeTriggers?.length ? p.urgeTriggers : DEFAULT_TRIGGERS);
+export const pillarsOf = (p: Prefs) => (p.pillars?.length ? p.pillars : DEFAULT_PILLARS);
+
+// ---------- Task estimates ----------
+
+/** "90" → 90 · "1.5h" → 90 · "2h30" / "2h 30m" → 150 · "45m" → 45 · "3d" → 3 work days of 8h. */
+export function parseEstimate(raw: string): number | null {
+  const s = raw.trim().toLowerCase().replace(/\s+/g, "");
+  if (!s) return null;
+  if (/^\d+(\.\d+)?$/.test(s)) return Math.round(Number(s));
+  const m = s.match(/^(?:(\d+(?:\.\d+)?)d)?(?:(\d+(?:\.\d+)?)h)?(?:(\d+)m?)?$/);
+  if (!m || (!m[1] && !m[2] && !m[3])) return null;
+  const mins = Number(m[1] ?? 0) * 8 * 60 + Number(m[2] ?? 0) * 60 + Number(m[3] ?? 0);
+  return mins > 0 ? Math.round(mins) : null;
+}
+export function fmtEstimate(mins: number): string {
+  if (!mins) return "";
+  const h = Math.floor(mins / 60);
+  const m = mins % 60;
+  return h ? `${h}h${m ? ` ${m}m` : ""}` : `${m}m`;
+}
+
+// ---------- Training ----------
+
+const MUSCLE_GUESS: [RegExp, string][] = [
+  [/plank|crunch|sit.?up|\babs?\b|core|leg raise|hollow|neck|grip/, "Core"],
+  [/push.?up|bench|chest|fly|dip/, "Chest"],
+  [/pull.?up|chin.?up|row|lat|deadlift|back/, "Back"],
+  [/squat|lunge|leg|calf|hamstring|glute|step.?up|jump/, "Legs"],
+  [/shoulder|overhead|ohp|military|lateral|raise|handstand|pike/, "Shoulders"],
+  [/curl|bicep|tricep|extension|arm/, "Arms"],
+];
+
+export function muscleFor(name: string, prefs: Prefs): string | null {
+  const key = name.trim().toLowerCase();
+  if (!key) return null;
+  const set = prefs.exerciseMuscles?.[key];
+  if (set) return set;
+  const muscles = musclesOf(prefs);
+  for (const [re, m] of MUSCLE_GUESS) if (re.test(key) && muscles.includes(m)) return m;
+  return null;
+}
+
+export function trainingWeek(workouts: Workout[], prefs: Prefs, from: string) {
+  const to = addDays(from, 6);
+  const perMuscle = new Map<string, number>(musclesOf(prefs).map((m) => [m, 0]));
+  const unknown = new Set<string>();
+  let sets = 0;
+  let sessions = 0;
+  for (const w of workouts) {
+    if (w.date < from || w.date > to) continue;
+    sessions++;
+    for (const x of w.exercises) {
+      if (!x.name.trim() || !x.sets) continue;
+      sets += x.sets;
+      const m = muscleFor(x.name, prefs);
+      if (m && perMuscle.has(m)) perMuscle.set(m, perMuscle.get(m)! + x.sets);
+      else unknown.add(x.name.trim());
+    }
+  }
+  return { perMuscle, unknown: [...unknown], sets, sessions };
+}
+
+export interface PR {
+  name: string;
+  weight: number;
+  reps: number;
+  date: string;
+}
+/** Best set per exercise: heaviest weight (then most reps); bodyweight moves: most reps. */
+export function personalRecords(workouts: Workout[]): PR[] {
+  const best = new Map<string, PR>();
+  const sorted = [...workouts].sort((a, b) => a.date.localeCompare(b.date));
+  for (const w of sorted)
+    for (const x of w.exercises) {
+      const key = x.name.trim().toLowerCase();
+      if (!key || !x.reps) continue;
+      const cur = best.get(key);
+      const better = !cur || x.weight > cur.weight || (x.weight === cur.weight && x.reps > cur.reps);
+      if (better) best.set(key, { name: x.name.trim(), weight: x.weight || 0, reps: x.reps, date: w.date });
+    }
+  return [...best.values()].sort((a, b) => b.date.localeCompare(a.date));
+}
+export const nextTarget = (pr: PR) => (pr.weight ? `${pr.weight + 2.5} kg × ${pr.reps}` : `${pr.reps + 1} reps`);
+
+// ---------- Protein ----------
+
+export const proteinOn = (date: string, meals: Meal[]) => meals.filter((m) => m.date === date).reduce((n, m) => n + (m.protein ?? 0), 0);
+export function latestWeight(days: HealthDay[]): number | null {
+  const w = days.filter((d) => d.weight).sort((a, b) => b.date.localeCompare(a.date))[0];
+  return w?.weight ?? null;
+}
+export function proteinTargetOf(prefs: Prefs, days: HealthDay[]) {
+  if (prefs.proteinTarget) return prefs.proteinTarget;
+  const w = latestWeight(days);
+  return w ? Math.round(w * 1.6) : 110;
+}
+
+// ---------- Battles ----------
+
+export function battleStats(b: Battle, urges: Urge[], entries: Entry[], tags: Map<string, Tag>, today = todayStr()) {
+  const mine = urges.filter((u) => u.kind === "urge" && u.battleId === b.id).sort((a, c) => a.at - c.at);
+  const thisWeek = weekStart(today);
+  const lastWeek = addDays(thisWeek, -7);
+  const inWeek = (u: Urge, w: string) => u.date >= w && u.date <= addDays(w, 6);
+  const lapses = mine.filter((u) => u.outcome === "gave");
+  const lastLapse = lapses[lapses.length - 1];
+  const cleanFrom = lastLapse ? lastLapse.date : b.startDate;
+  const daysClean = Math.max(0, Math.round((Date.parse(today) - Date.parse(cleanFrom)) / 864e5));
+  // Best clean run between lapses (in days).
+  let best = 0;
+  let prev = b.startDate;
+  for (const l of lapses) {
+    best = Math.max(best, Math.round((Date.parse(l.date) - Date.parse(prev)) / 864e5));
+    prev = l.date;
+  }
+  best = Math.max(best, daysClean);
+  const weeks = Array.from({ length: 8 }, (_, i) => addDays(thisWeek, -7 * (7 - i)));
+  const urgesPerWeek = weeks.map((w) => mine.filter((u) => inWeek(u, w)).length);
+  const triggers = new Map<string, number>();
+  for (const u of mine) if (u.trigger) triggers.set(u.trigger, (triggers.get(u.trigger) ?? 0) + 1);
+  const minsIn = (w: string) =>
+    entries
+      .filter((e) => e.date >= w && e.date <= addDays(w, 6) && (b.tagIds.length ? b.tagIds.includes(e.tagId) : (e.wasted ?? tags.get(e.tagId)?.wasted)))
+      .reduce((n, e) => n + Math.max(0, e.end - e.start), 0);
+  return {
+    daysClean,
+    best,
+    week: mine.filter((u) => inWeek(u, thisWeek)),
+    lastWeekCount: mine.filter((u) => inWeek(u, lastWeek)).length,
+    lapsesThisWeek: mine.filter((u) => inWeek(u, thisWeek) && u.outcome === "gave").length,
+    urgesPerWeek,
+    weeks,
+    topTriggers: [...triggers.entries()].sort((a, c) => c[1] - a[1]).slice(0, 3),
+    minsPerWeek: weeks.map(minsIn),
+  };
+}
+
+// ---------- Things (formerly "projects") ----------
+
+export const thingKey = (name: string) => name.trim().toLowerCase();
+
+export function useThings() {
+  const things = useList("things");
+  return useMemo(() => {
+    const m = new Map<string, Thing>();
+    for (const t of things) m.set(thingKey(t.name), t);
+    return m;
+  }, [things]);
+}
+export function thingIcon(name: string, things: Map<string, Thing>) {
+  return things.get(thingKey(name))?.emoji ?? "🗂️";
+}
+
+/** Rename a Thing everywhere it's used (entries, tasks, timer). */
+export function useRenameThing() {
+  const { data, putMany, put } = useStore();
+  return (from: string, to: string) => {
+    const k = thingKey(from);
+    const nt = to.trim();
+    if (!nt || k === thingKey(nt)) return;
+    const live = <T extends { del?: boolean; project?: string }>(r: Record<string, T>) => Object.values(r).filter((x) => !x.del && x.project && thingKey(x.project) === k);
+    const es = live(data.entries);
+    if (es.length) putMany("entries", es.map((e) => ({ ...e, project: nt })));
+    const ts = live(data.tasks);
+    if (ts.length) putMany("tasks", ts.map((t) => ({ ...t, project: nt })));
+    const timer = data.meta.timer as Timer | undefined;
+    if (timer && !timer.del && timer.project && thingKey(timer.project) === k) put("meta", { ...timer, project: nt });
+  };
+}
