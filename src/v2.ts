@@ -20,11 +20,19 @@ export const DEFAULT_PROTEIN_FOODS = [
   { emoji: "🌱", label: "Soya chunks 50g", grams: 26 },
 ];
 export const DEFAULT_TRIGGERS = ["🌙 Late night", "😔 Lonely", "😩 Tired", "😤 Angry", "🍔 Hungry", "🥱 Bored", "🛏️ In bed", "📱 Notification", "😰 Stressed"];
+const yearStartStr = () => `${new Date().getFullYear()}-01-01`;
 export const DEFAULT_PILLARS: PillarDef[] = [
-  { id: "body", label: "Body", emoji: "🥋", color: "#f43f5e", source: "body" },
-  { id: "wealth", label: "Wealth", emoji: "💰", color: "#fbbf24", source: "quest" },
-  { id: "mind", label: "Mind", emoji: "🧘", color: "#38bdf8", source: "mind" },
+  { id: "body", label: "Body", emoji: "🥋", color: "#f43f5e", source: "body", target: 365 },
+  { id: "wealth", label: "Wealth", emoji: "💰", color: "#fbbf24", source: "money", target: 100000, current: 0 },
+  { id: "mind", label: "Mind", emoji: "🧘", color: "#38bdf8", source: "mind", target: 365 },
 ];
+/** Fill in targets for pillars saved by earlier builds. */
+function withDefaults(p: PillarDef): PillarDef {
+  const q = p.id === "wealth" && p.source === "quest" && !p.questId ? { ...p, source: "money" as const } : p;
+  if (q.source === "money") return { target: 100000, current: 0, ...q };
+  if (q.source === "body" || q.source === "mind") return { target: 365, start: yearStartStr(), ...q, ...(q.start ? {} : { start: yearStartStr() }) };
+  return q;
+}
 export const DASH_CARDS: { id: string; label: string }[] = [
   { id: "hero", label: "Level, stats & pillars" },
   { id: "tasks", label: "📋 Today's tasks" },
@@ -49,7 +57,7 @@ export const musclesOf = (p: Prefs) => (p.muscles?.length ? p.muscles : DEFAULT_
 export const estimatesOf = (p: Prefs) => (p.estimatePresets?.length ? p.estimatePresets : DEFAULT_ESTIMATES);
 export const foodsOf = (p: Prefs) => p.proteinFoods ?? DEFAULT_PROTEIN_FOODS;
 export const triggersOf = (p: Prefs) => (p.urgeTriggers?.length ? p.urgeTriggers : DEFAULT_TRIGGERS);
-export const pillarsOf = (p: Prefs) => (p.pillars?.length ? p.pillars : DEFAULT_PILLARS);
+export const pillarsOf = (p: Prefs) => (p.pillars?.length ? p.pillars : DEFAULT_PILLARS).map(withDefaults);
 
 // ---------- Task estimates ----------
 
@@ -148,6 +156,12 @@ export function proteinTargetOf(prefs: Prefs, days: HealthDay[]) {
 
 // ---------- Battles ----------
 
+export const splitTriggers = (t: string) =>
+  (t || "")
+    .split(/[,;\n+&/]|\band\b/i)
+    .map((x) => x.trim().replace(/^[^\p{L}\p{N}]+/u, ""))
+    .filter((x) => x.length > 1);
+
 export function battleStats(b: Battle, urges: Urge[], entries: Entry[], tags: Map<string, Tag>, today = todayStr()) {
   const mine = urges.filter((u) => u.kind === "urge" && u.battleId === b.id).sort((a, c) => a.at - c.at);
   const thisWeek = weekStart(today);
@@ -168,7 +182,12 @@ export function battleStats(b: Battle, urges: Urge[], entries: Entry[], tags: Ma
   const weeks = Array.from({ length: 8 }, (_, i) => addDays(thisWeek, -7 * (7 - i)));
   const urgesPerWeek = weeks.map((w) => mine.filter((u) => inWeek(u, w)).length);
   const triggers = new Map<string, number>();
-  for (const u of mine) if (u.trigger) triggers.set(u.trigger, (triggers.get(u.trigger) ?? 0) + 1);
+  // Triggers are free text ("tired, alone in bed, after 11pm"): count each part separately.
+  for (const u of mine)
+    for (const part of splitTriggers(u.trigger)) {
+      const k = part.toLowerCase();
+      triggers.set(k, (triggers.get(k) ?? 0) + 1);
+    }
   const minsIn = (w: string) =>
     entries
       .filter((e) => e.date >= w && e.date <= addDays(w, 6) && (b.tagIds.length ? b.tagIds.includes(e.tagId) : (e.wasted ?? tags.get(e.tagId)?.wasted)))

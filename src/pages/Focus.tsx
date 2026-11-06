@@ -1,3 +1,4 @@
+import { fmtEstimate } from "../v2";
 import { useState } from "react";
 import { useList, useMap, useStore } from "../store";
 import { addDays, fmtDay, fmtHours, fmtTime, todayStr, weekStart } from "../dates";
@@ -64,7 +65,7 @@ export default function Focus() {
                 {timerDisplay(timer, now)}
               </text>
               <text x="130" y="160" className="ring-sub">
-                {timer.pausedAt ? "paused" : over ? "done! keep going or finish" : timer.plannedMins ? `of ${timer.plannedMins} min` : "tracking"}
+                {timer.pausedAt ? "paused" : over ? "done! keep going or finish" : timer.plannedMins ? `of ${fmtEstimate(timer.plannedMins)}` : "tracking"}
               </text>
             </svg>
             <h2>{timer.label}</h2>

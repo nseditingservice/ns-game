@@ -95,7 +95,7 @@ export function TaskRow({ t, go, showDue = true }: { t: Task; go?: Go; showDue?:
               className="icon-btn"
               title="Focus on this task"
               onClick={() => {
-                timerAct.start({ label: t.title, tagId: t.tagId ?? "tag-deep-work", taskId: t.id, plannedMins: Math.min(Math.max(t.estimateMins || 50, 15), 120), project: t.project });
+                timerAct.start({ label: t.title, tagId: t.tagId ?? "tag-deep-work", taskId: t.id, plannedMins: Math.max(t.estimateMins || 50, 5), project: t.project });
                 go?.("focus");
               }}
             >

@@ -330,8 +330,11 @@ export interface PillarDef {
   label: string;
   emoji: string;
   color: string;
-  source: "body" | "mind" | "quest";
+  source: "body" | "mind" | "quest" | "money";
   questId?: string;
+  target?: number; // body: workouts · mind: learnings + urges surfed · money: $
+  start?: string; // count from this date (body / mind)
+  current?: number; // money: where you are now ($)
 }
 
 /** Looks for a "Thing" (what used to be called a project). Keyed by name; entries keep storing the name. */

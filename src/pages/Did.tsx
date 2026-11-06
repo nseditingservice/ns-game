@@ -6,7 +6,7 @@ import { addDays, addMonths, dateRange, fmtDay, fmtHours, fmtTime, monthEnd, mon
 import { entryMins, isWasted } from "../game";
 import { Empty, Modal } from "../ui";
 import { EntryEditor } from "../components/EntryEditor";
-import { ThingsEditor } from "../components/Things";
+import { ThingIconPicker, ThingsEditor } from "../components/Things";
 import { thingIcon, thingKey, useThings } from "../v2";
 
 type Period = "day" | "week" | "month" | "year" | "all";
@@ -62,6 +62,7 @@ export default function Did() {
   const { prefs } = useStore();
   const things = useThings();
   const [editThings, setEditThings] = useState(false);
+  const [iconFor, setIconFor] = useState<string | null>(null);
   const allTags = useList("tags");
   const entries = useList("entries");
   const [period, setPeriod] = useState<Period>("week");
@@ -251,14 +252,16 @@ export default function Did() {
         return (
           <section className="card">
             <div className="card-head">
-              <h2>Things</h2>
+              <h2>Things/Projects</h2>
               <button className="btn ghost small" onClick={() => setEditThings(true)}>
-                ✎ Edit Things
+                ✎ Edit icons & names
               </button>
             </div>
             {top.map(([p, m]) => (
               <div key={p} className="did-row" onClick={() => setQuery(p)}>
-                <span className="did-emoji">{thingIcon(p, things)}</span>
+                <button className="did-emoji thing-icon-btn" title="Change icon" onClick={(ev) => { ev.stopPropagation(); setIconFor(p); }}>
+                  {thingIcon(p, things)}
+                </button>
                 <div className="grow">
                   <div className="row between">
                     <span>{p}</span>
@@ -326,6 +329,7 @@ export default function Did() {
       {detail && <TagDetail tag={tagMap.get(detail.id) ?? detail} entries={entries.filter((e) => e.tagId === detail.id)} onEditEntry={setEditEntry} onClose={() => setDetail(null)} onEdit={() => { setEditing(tagMap.get(detail.id) ?? detail); setDetail(null); }} />}
       {editing && <TagEditor tag={editing} onClose={() => setEditing(null)} />}
       {editThings && <ThingsEditor onClose={() => setEditThings(false)} />}
+      {iconFor && <ThingIconPicker name={iconFor} onClose={() => setIconFor(null)} />}
     </div>
   );
 }

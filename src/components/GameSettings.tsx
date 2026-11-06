@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useStore } from "../store";
-import { DEFAULT_PENALTY, DEFAULT_SETS_TARGET, estimatesOf, fmtEstimate, foodsOf, musclesOf, parseEstimate, triggersOf } from "../v2";
+import { DEFAULT_PENALTY, estimatesOf, fmtEstimate, foodsOf, parseEstimate } from "../v2";
 
 /** Comma-separated list field that saves when you leave it. */
 function ListField({ label, value, onSave, hint }: { label: string; value: string[]; onSave: (v: string[]) => void; hint?: string }) {
@@ -22,7 +22,7 @@ export function GameSettings() {
 
   return (
     <section className="card form">
-      <h2>🎮 Game, body & training settings</h2>
+      <h2>🎮 Game & health settings</h2>
       <p className="muted small">Everything here is yours to change. Leave a number empty to use the default.</p>
       <div className="row wrap">
         <label>
@@ -35,10 +35,6 @@ export function GameSettings() {
           <input type="number" min={0} placeholder="auto: 1.6 × weight" value={prefs.proteinTarget ?? ""} onChange={(e) => setPrefs({ proteinTarget: num(e.target.value) || undefined })} style={{ width: 150 }} />
         </label>
         <label>
-          Hard sets per muscle / week
-          <input type="number" min={1} placeholder={String(DEFAULT_SETS_TARGET)} value={prefs.setsTarget ?? ""} onChange={(e) => setPrefs({ setsTarget: num(e.target.value) || undefined })} style={{ width: 130 }} />
-        </label>
-        <label>
           Top 4 in Things I Did ranks
           <select value={prefs.top4By ?? "things"} onChange={(e) => setPrefs({ top4By: e.target.value as "things" | "tags" })}>
             <option value="things">by Things (fallback: tag)</option>
@@ -46,9 +42,7 @@ export function GameSettings() {
           </select>
         </label>
       </div>
-      <ListField label="Muscle groups" value={musclesOf(prefs)} onSave={(v) => setPrefs({ muscles: v })} hint="Comma separated, e.g. Chest, Back, Legs, Shoulders, Arms, Core, Neck" />
       <ListField label="Task estimate quick picks" value={estimatesOf(prefs).map(fmtEstimate)} onSave={(v) => setPrefs({ estimatePresets: v.map(parseEstimate).filter((x): x is number => !!x) })} hint="e.g. 15m, 30m, 1h, 2h, 4h, 6h, 8h, 2d" />
-      <ListField label="Urge triggers" value={triggersOf(prefs)} onSave={(v) => setPrefs({ urgeTriggers: v })} hint="Shown when you log an urge or a reaction" />
       <div>
         <div className="muted small">🍗 One-tap protein foods (Health page)</div>
         {foods.map((f, i) => (

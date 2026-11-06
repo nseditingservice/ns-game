@@ -1,83 +1,130 @@
 import { useEffect, useRef, useState } from "react";
 import { useList, useStore } from "../store";
 import type { PillarDef } from "../types";
-import { dateRange, todayStr, weekStart } from "../dates";
-import { habitStatus, isScheduled, useIndex } from "../game";
+import { useIndex } from "../game";
 import { fmtVal, questState } from "../quest";
 import { Modal } from "../ui";
-import { DASH_CARDS, DEFAULT_PILLARS, dashLayout, pillarsOf, trainingWeek } from "../v2";
+import { DASH_CARDS, DEFAULT_PILLARS, dashLayout, pillarsOf } from "../v2";
 
-const mean = (xs: number[]) => (xs.length ? xs.reduce((a, b) => a + b, 0) / xs.length : null);
-
-/** Three thin bars: Body / Wealth / Mind (all editable in Customize). */
-export function PillarsBar() {
-  const { prefs } = useStore();
+/** Progress of one pillar: 0–1 plus a hover hint (the bar itself shows no numbers). */
+export function usePillarValue() {
   const ix = useIndex();
   const workouts = useList("workouts");
   const goals = useList("goals");
   const goalLogs = useList("goalLogs");
   const tasks = useList("tasks");
   const urges = useList("urges");
-  const today = todayStr();
-  const wk = weekStart(today);
-
-  const value = (p: PillarDef): { frac: number | null; text: string } => {
+  return (p: PillarDef): { frac: number; hint: string } => {
+    const target = Math.max(1, p.target ?? 1);
     if (p.source === "quest") {
-      const g = goals.find((x) => x.id === p.questId) ?? goals.find((x) => !x.done && x.metric && ["$", "USD"].includes(x.metric.unit)) ?? goals.find((x) => !x.done);
-      if (!g) return { frac: null, text: "add a quest" };
+      const g = goals.find((x) => x.id === p.questId) ?? goals.find((x) => !x.done);
+      if (!g) return { frac: 0, hint: "Link a quest" };
       const st = questState(g, goalLogs, tasks);
       const v = (n: number) => (st.kind === "tasks" ? `${Math.round(n)}` : fmtVal(n, st.unit));
-      return { frac: st.frac, text: `${v(st.current)} / ${v(st.target)}` };
+      return { frac: st.frac, hint: `${g.title}: ${v(st.current)} / ${v(st.target)}` };
     }
-    const days = dateRange(wk, today);
+    if (p.source === "money") {
+      const cur = p.current ?? 0;
+      return { frac: cur / target, hint: `${fmtVal(cur, "$")} / ${fmtVal(target, "$")}` };
+    }
+    const from = p.start ?? "0000";
     if (p.source === "body") {
-      const tw = trainingWeek(workouts, prefs, wk);
-      const target = (prefs.setsTarget ?? 10) * 3; // ~10 sets for 3 big groups = a solid week
-      const training = Math.min(1, Math.max(tw.sets / target, tw.sessions / 4));
-      const sleeps = days.map((d) => ix.health.get(d)?.sleepHours).filter((h): h is number => !!h);
-      const sleep = sleeps.length ? Math.min(1, (mean(sleeps) ?? 0) / 7.5) : null;
-      const f = mean([training, ...(sleep != null ? [sleep] : [])]);
-      return { frac: f, text: f == null ? "–" : `${Math.round(f * 100)}%` };
+      const n = workouts.filter((w) => w.date >= from).length;
+      return { frac: n / target, hint: `${n} / ${target} workouts since ${from}` };
     }
-    // mind: mind & spirit habits done this week + share of urges surfed
-    const parts: number[] = [];
-    let due = 0;
-    let done = 0;
-    for (const h of ix.habits.filter((x) => x.area === "mind" || x.area === "spirit"))
-      for (const d of days) {
-        if (!isScheduled(h, d)) continue;
-        const s = habitStatus(h, d, ix);
-        if (s === "skip" || (s === "pending" && d === today)) continue;
-        due++;
-        if (s === "done") done++;
-      }
-    if (due) parts.push(done / due);
-    const wUrges = urges.filter((u) => u.date >= wk && u.kind === "urge" && u.outcome);
-    if (wUrges.length) parts.push(wUrges.filter((u) => u.outcome === "surfed").length / wUrges.length);
-    const reacted = urges.filter((u) => u.date >= wk && u.kind === "reacted").length;
-    let f = mean(parts);
-    if (f != null && reacted) f = Math.max(0, f - 0.05 * reacted);
-    return { frac: f, text: f == null ? "–" : `${Math.round(f * 100)}%` };
+    const learned = [...ix.journal.values()].filter((j) => j.date >= from && j.learned?.trim()).length;
+    const surfed = urges.filter((u) => u.date >= from && u.kind === "urge" && u.outcome === "surfed").length;
+    return { frac: (learned + surfed) / target, hint: `${learned} things learned + ${surfed} urges surfed = ${learned + surfed} / ${target} since ${from}` };
   };
+}
 
+/** Three thin bars: Body / Wealth / Mind. Just bars. Tap one to edit it. */
+export function PillarsBar() {
+  const { prefs } = useStore();
+  const value = usePillarValue();
+  const [edit, setEdit] = useState<number | null>(null);
+  const pillars = pillarsOf(prefs);
   return (
     <div className="pillars">
-      {pillarsOf(prefs).map((p) => {
+      {pillars.map((p, i) => {
         const v = value(p);
         return (
-          <div key={p.id} className="pillar" title={p.source === "body" ? "This week: training (sets or sessions) + sleep" : p.source === "mind" ? "This week: mind & spirit habits + urges surfed" : "Linked quest"}>
-            <div className="row between small">
-              <span>
-                {p.emoji} {p.label}
-              </span>
-              <b>{v.text}</b>
-            </div>
+          <button key={p.id} className="pillar" title={v.hint} onClick={() => setEdit(i)}>
+            <span className="pillar-name">
+              {p.emoji} {p.label}
+            </span>
             <div className="bar thin">
-              <div style={{ width: `${Math.min(100, (v.frac ?? 0) * 100)}%`, background: p.color }} />
+              <div style={{ width: `${Math.min(100, Math.max(0, v.frac) * 100)}%`, background: p.color }} />
             </div>
-          </div>
+          </button>
         );
       })}
+      {edit != null && (
+        <Modal title={`${pillars[edit].emoji} ${pillars[edit].label}`} onClose={() => setEdit(null)}>
+          <PillarFields i={edit} />
+          <button className="btn primary" onClick={() => setEdit(null)}>
+            Done
+          </button>
+        </Modal>
+      )}
+    </div>
+  );
+}
+
+/** Everything about one pillar, editable. */
+function PillarFields({ i }: { i: number }) {
+  const { prefs, setPrefs } = useStore();
+  const goals = useList("goals");
+  const value = usePillarValue();
+  const pillars = pillarsOf(prefs);
+  const p = pillars[i];
+  const set = (patch: Partial<PillarDef>) => setPrefs({ pillars: pillars.map((x, j) => (j === i ? { ...x, ...patch } : x)) });
+  const num = (v: string) => (v === "" ? undefined : Math.max(0, Number(v)));
+  return (
+    <div className="pillar-edit">
+      <div className="row wrap">
+        <input className="emoji-input" value={p.emoji} onChange={(e) => set({ emoji: e.target.value.slice(0, 4) })} />
+        <input value={p.label} onChange={(e) => set({ label: e.target.value })} style={{ width: 120 }} />
+        <input type="color" value={p.color} onChange={(e) => set({ color: e.target.value })} title="Bar colour" />
+        <select
+          value={p.source === "quest" ? `q:${p.questId ?? ""}` : p.source}
+          onChange={(e) => {
+            const v = e.target.value;
+            set(v.startsWith("q:") ? { source: "quest", questId: v.slice(2) || undefined } : { source: v as PillarDef["source"], questId: undefined });
+          }}
+        >
+          <option value="body">Counts workouts</option>
+          <option value="mind">Counts things learned + urges surfed</option>
+          <option value="money">Money: amount I have ($)</option>
+          <option value="q:">Follows a quest (first open one)</option>
+          {goals.map((g) => (
+            <option key={g.id} value={`q:${g.id}`}>
+              Follows quest: {g.title}
+            </option>
+          ))}
+        </select>
+      </div>
+      {p.source !== "quest" && (
+        <div className="row wrap">
+          {p.source === "money" && (
+            <label>
+              I have now ($)
+              <input type="number" min={0} value={p.current ?? ""} onChange={(e) => set({ current: num(e.target.value) })} style={{ width: 140 }} />
+            </label>
+          )}
+          <label>
+            Goal {p.source === "money" ? "($)" : p.source === "body" ? "(workouts)" : "(learnings + urges)"}
+            <input type="number" min={1} value={p.target ?? ""} onChange={(e) => set({ target: num(e.target.value) })} style={{ width: 140 }} />
+          </label>
+          {(p.source === "body" || p.source === "mind") && (
+            <label>
+              Count from
+              <input type="date" value={p.start ?? ""} onChange={(e) => e.target.value && set({ start: e.target.value })} />
+            </label>
+          )}
+        </div>
+      )}
+      <p className="muted tiny">{value(p).hint}</p>
     </div>
   );
 }
@@ -188,7 +235,6 @@ export function VisionCard() {
 
 export function CustomizeDash({ onClose }: { onClose: () => void }) {
   const { prefs, setPrefs } = useStore();
-  const goals = useList("goals");
   const layout = dashLayout(prefs);
   const pillars = pillarsOf(prefs);
   const save = (next: typeof layout) => setPrefs({ dashCards: next });
@@ -199,7 +245,6 @@ export function CustomizeDash({ onClose }: { onClose: () => void }) {
     [next[i], next[j]] = [next[j], next[i]];
     save(next);
   };
-  const setPillar = (i: number, patch: Partial<PillarDef>) => setPrefs({ pillars: pillars.map((p, j) => (j === i ? { ...p, ...patch } : p)) });
 
   return (
     <Modal title="⚙ Customize dashboard" onClose={onClose}>
@@ -222,23 +267,9 @@ export function CustomizeDash({ onClose }: { onClose: () => void }) {
           </li>
         ))}
       </ul>
-      <h3>Pillars (bars in the level card)</h3>
+      <h3>Pillars (the 3 bars in the level card)</h3>
       {pillars.map((p, i) => (
-        <div key={p.id} className="row wrap pillar-edit">
-          <input className="emoji-input" value={p.emoji} onChange={(e) => setPillar(i, { emoji: e.target.value.slice(0, 4) })} />
-          <input value={p.label} onChange={(e) => setPillar(i, { label: e.target.value })} style={{ width: 110 }} />
-          <input type="color" value={p.color} onChange={(e) => setPillar(i, { color: e.target.value })} />
-          <select value={p.source === "quest" ? `q:${p.questId ?? ""}` : p.source} onChange={(e) => { const v = e.target.value; setPillar(i, v.startsWith("q:") ? { source: "quest", questId: v.slice(2) || undefined } : { source: v as "body" | "mind", questId: undefined }); }}>
-            <option value="body">Body: training + sleep (auto)</option>
-            <option value="mind">Mind: mind habits + urges surfed (auto)</option>
-            <option value="q:">Quest: first money quest (auto)</option>
-            {goals.map((g) => (
-              <option key={g.id} value={`q:${g.id}`}>
-                Quest: {g.title}
-              </option>
-            ))}
-          </select>
-        </div>
+        <PillarFields key={p.id} i={i} />
       ))}
       <div className="row between">
         <button className="btn ghost small" onClick={() => setPrefs({ dashCards: undefined, pillars: DEFAULT_PILLARS })}>

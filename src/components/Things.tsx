@@ -28,7 +28,7 @@ export function ThingsEditor({ onClose }: { onClose: () => void }) {
   }, [entries, tasks, things]);
 
   return (
-    <Modal title="✎ Edit Things" onClose={onClose}>
+    <Modal title="✎ Edit Things/Projects" onClose={onClose}>
       <p className="muted small">A Thing is what you worked on: a client, a business, a skill. Give each one an icon and colour. Renaming updates all its past entries and tasks.</p>
       {!rows.length && <p className="muted">No Things yet. Type one in the "Thing" field when you log time or create a task.</p>}
       {rows.map(([k, r]) => (
@@ -90,5 +90,32 @@ function ThingRow({ name, mins, meta }: { name: string; mins: number; meta?: Thi
         </label>
       </div>
     </div>
+  );
+}
+
+/** Quick icon picker for one Thing (tap the icon in Things I Did). */
+export function ThingIconPicker({ name, onClose }: { name: string; onClose: () => void }) {
+  const { put } = useStore();
+  const things = useThings();
+  const meta = things.get(thingKey(name));
+  const t: Thing = meta ?? { id: uid(), u: 0, name, emoji: "🗂️", color: PALETTE[name.length % PALETTE.length] };
+  const pick = (emoji: string) => {
+    put("things", { ...t, emoji });
+    onClose();
+  };
+  return (
+    <Modal title={`Icon for ${name}`} onClose={onClose}>
+      <div className="icon-grid">
+        {ICONS.map((ic) => (
+          <button key={ic} className={ic === t.emoji ? "sel" : ""} onClick={() => pick(ic)}>
+            {ic}
+          </button>
+        ))}
+      </div>
+      <label>
+        Or type / paste any emoji
+        <input className="emoji-input" placeholder="🙂" onKeyDown={(e) => { const v = (e.target as HTMLInputElement).value.trim(); if (e.key === "Enter" && v) pick(v.slice(0, 4)); }} onBlur={(e) => e.target.value.trim() && pick(e.target.value.trim().slice(0, 4))} />
+      </label>
+    </Modal>
   );
 }

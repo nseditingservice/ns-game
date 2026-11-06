@@ -2,13 +2,12 @@ import { useEffect, useState } from "react";
 import { uid, useList, useStore } from "../store";
 import { celebrate, Modal } from "../ui";
 import { todayStr, weekStart } from "../dates";
-import { triggersOf } from "../v2";
 
 const SURF_SECS = 90;
 
 /** Urge surfing (Bowen & Marlatt 2009): notice the urge, breathe, watch it rise and fall. */
 export function UrgeModal({ onClose, battleId: initialBattle = null }: { onClose: () => void; battleId?: string | null }) {
-  const { put, prefs } = useStore();
+  const { put } = useStore();
   const battles = useList("battles").filter((b) => !b.archived);
   const [battleId, setBattleId] = useState<string | null>(initialBattle ?? (battles.length === 1 ? battles[0].id : null));
   const [intensity, setIntensity] = useState<number | null>(null);
@@ -23,7 +22,7 @@ export function UrgeModal({ onClose, battleId: initialBattle = null }: { onClose
   const left = Math.max(0, SURF_SECS - Math.floor((now - start) / 1000));
   const phase = Math.floor((now - start) / 1000) % 10; // 4s in, 6s long out
   const save = (outcome: "surfed" | "gave") => {
-    put("urges", { id: uid(), date: todayStr(), at: Date.now(), kind: "urge", battleId, intensity, trigger, outcome, note: note.trim() });
+    put("urges", { id: uid(), date: todayStr(), at: Date.now(), kind: "urge", battleId, intensity, trigger: trigger.trim(), outcome, note: note.trim() });
     if (outcome === "surfed") celebrate("You rode the wave. +15 XP", "🌊");
     else celebrate("Logged. One slip isn't who you are. Back on it.", "🤝");
     onClose();
@@ -56,7 +55,10 @@ export function UrgeModal({ onClose, battleId: initialBattle = null }: { onClose
           ))}
         </div>
       </label>
-      <TriggerPick value={trigger} onChange={setTrigger} options={triggersOf(prefs)} />
+      <label>
+        What triggered it? <span className="muted tiny">(write everything: it's often several things at once)</span>
+        <textarea rows={2} placeholder="e.g. alone in bed after 11pm, tired, saw a story, felt lonely" value={trigger} onChange={(e) => setTrigger(e.target.value)} />
+      </label>
       <input placeholder="Note (optional)" value={note} onChange={(e) => setNote(e.target.value)} />
       <div className="row wrap between">
         <button className="btn primary" onClick={() => save("surfed")}>
@@ -70,35 +72,23 @@ export function UrgeModal({ onClose, battleId: initialBattle = null }: { onClose
   );
 }
 
-function TriggerPick({ value, onChange, options }: { value: string; onChange: (v: string) => void; options: string[] }) {
-  return (
-    <label>
-      What triggered it?
-      <div className="row wrap">
-        {options.map((t) => (
-          <button key={t} className={`btn small ${value === t ? "primary" : ""}`} onClick={() => onChange(value === t ? "" : t)}>
-            {t}
-          </button>
-        ))}
-      </div>
-    </label>
-  );
-}
-
 /** "I reacted" (instead of responding calmly). Naming the emotion is the first step to calm. */
 export function ReactedModal({ onClose }: { onClose: () => void }) {
-  const { put, prefs } = useStore();
+  const { put } = useStore();
   const [trigger, setTrigger] = useState("");
   const [note, setNote] = useState("");
   return (
     <Modal title="😤 I reacted" onClose={onClose}>
       <p className="muted small">No judgement. Naming what happened is how you get calmer next time.</p>
-      <TriggerPick value={trigger} onChange={setTrigger} options={triggersOf(prefs)} />
+      <label>
+        What triggered it? <span className="muted tiny">(as many things as you like)</span>
+        <textarea rows={2} placeholder="e.g. client was late, hungry, didn't sleep well" value={trigger} onChange={(e) => setTrigger(e.target.value)} />
+      </label>
       <textarea rows={2} placeholder="What happened? What would the calm version of you have done?" value={note} onChange={(e) => setNote(e.target.value)} />
       <button
         className="btn primary"
         onClick={() => {
-          put("urges", { id: uid(), date: todayStr(), at: Date.now(), kind: "reacted", battleId: null, intensity: null, trigger, outcome: null, note: note.trim() });
+          put("urges", { id: uid(), date: todayStr(), at: Date.now(), kind: "reacted", battleId: null, intensity: null, trigger: trigger.trim(), outcome: null, note: note.trim() });
           celebrate("Noted. Awareness is the first step.", "🧘");
           onClose();
         }}
@@ -115,14 +105,16 @@ export function MindCheckCard() {
   const [open, setOpen] = useState<"urge" | "reacted" | null>(null);
   const wk = weekStart(todayStr());
   const week = urges.filter((u) => u.date >= wk);
+  const urgeCount = week.filter((u) => u.kind === "urge").length;
   const surfed = week.filter((u) => u.kind === "urge" && u.outcome === "surfed").length;
+  const slips = week.filter((u) => u.kind === "urge" && u.outcome === "gave").length;
   const reacted = week.filter((u) => u.kind === "reacted").length;
   return (
     <section className="card">
       <div className="card-head">
         <h2>🧘 Mind check</h2>
         <span className="muted small">
-          this week: {surfed} urge{surfed === 1 ? "" : "s"} surfed · {reacted} reacted
+          this week: {urgeCount} urge{urgeCount === 1 ? "" : "s"} ({surfed} surfed, {slips} slip{slips === 1 ? "" : "s"}) · {reacted} reacted
         </span>
       </div>
       <div className="row wrap">

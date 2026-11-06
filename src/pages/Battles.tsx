@@ -146,7 +146,7 @@ function BattleCard({ b, urges, stats: s, onEdit, onUrge }: { b: Battle; urges: 
           <span className="muted">Top triggers:</span>
           {s.topTriggers.map(([t, n]) => (
             <span key={t} className="chip bad">
-              {t} ×{n}
+              {t[0].toUpperCase() + t.slice(1)} ×{n}
             </span>
           ))}
         </div>

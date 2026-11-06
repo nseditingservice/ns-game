@@ -19,6 +19,12 @@ import { MindCheckCard } from "../components/MindCheck";
 import { CustomizeDash, PillarsBar, VisionCard } from "../components/Dashboard";
 import { dashLayout } from "../v2";
 
+/** Always in hours: 0h · 45m → 0h 45m · 2h 40m */
+const fmtHM = (mins: number) => {
+  const m = Math.round(mins);
+  return `${Math.floor(m / 60)}h${m % 60 ? ` ${m % 60}m` : ""}`;
+};
+
 export default function Today({ go }: { go: Go }) {
   const { prefs, timer, put, data, local, setLocal } = useStore();
   const sync = useSync();
@@ -105,15 +111,15 @@ export default function Today({ go }: { go: Go }) {
             <span>habits</span>
           </div>
           <div className="said-no-stat">
-            <b>{fmtHours(wastedToday)}</b>
-            <span>said NO today</span>
+            <b>{fmtHM(wastedToday)}</b>
+            <span>Wasted Time</span>
           </div>
           <div>
             <b>{tasksDoneToday}</b>
             <span>tasks done</span>
           </div>
           <div>
-            <b>{fmtHours(focusToday)}</b>
+            <b>{fmtHM(focusToday)}</b>
             <span>focus</span>
           </div>
         </div>

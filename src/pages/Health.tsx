@@ -1,10 +1,11 @@
 import { useState } from "react";
 import { PALETTE, uid, useList, useStore } from "../store";
 import type { Exercise, HealthDay, Meal, MealQuality, Workout, WorkoutType } from "../types";
-import { addDays, dateRange, fmtDay, fmtTime, nowMins, parseTime, todayStr, weekStart } from "../dates";
+import { addDays, dateRange, fmtDay, fmtTime, nowMins, parseTime, todayStr } from "../dates";
 import { celebrate, Empty, Modal, Rating } from "../ui";
-import { fmtL, waterMl } from "../water";
-import { DEFAULT_SETS_TARGET, foodsOf, muscleFor, musclesOf, nextTarget, personalRecords, proteinOn, proteinTargetOf, trainingWeek } from "../v2";
+import { waterMl } from "../water";
+import { foodsOf, proteinOn, proteinTargetOf } from "../v2";
+import { HealthTrends } from "../components/HealthTrends";
 
 const DEFAULT_WORKOUT_TYPES: WorkoutType[] = ["Muay Thai", "Strength", "Run", "Walk", "Cycle", "HIIT", "Yoga", "Sport", "Swim", "Stretch", "Other"].map((name) => ({ name, tagId: null }));
 const Q: Record<MealQuality, { emoji: string; label: string }> = { great: { emoji: "🟢", label: "Healthy" }, ok: { emoji: "🟡", label: "Okay" }, junk: { emoji: "🔴", label: "Junk" } };
@@ -14,13 +15,12 @@ const blankDay = (date: string): HealthDay => ({ id: date, u: 0, date, sleepHour
 const mealKindFor = (m: number): Meal["kind"] => (m < 10 * 60 + 30 ? "breakfast" : m < 15 * 60 ? "lunch" : m < 17 * 60 + 30 ? "snack" : "dinner");
 
 export default function Health() {
-  const { data, put, del, prefs } = useStore();
+  const { data, put, del } = useStore();
   const [date, setDate] = useState(todayStr());
   const [editingWorkout, setEditingWorkout] = useState<Workout | null>(null);
   const [editingMeal, setEditingMeal] = useState<Meal | null>(null);
   const meals = useList("meals");
   const workouts = useList("workouts");
-  const healthDays = useList("healthDays");
   const hd = (data.healthDays[date] && !data.healthDays[date].del ? data.healthDays[date] : null) ?? blankDay(date);
   const dayMeals = meals.filter((m) => m.date === date).sort((a, b) => a.time - b.time);
   const dayWorkouts = workouts.filter((w) => w.date === date);
@@ -46,20 +46,6 @@ export default function Health() {
     setWhat("");
     setProtein("");
   };
-
-  // ---- trends ----
-  const last30 = dateRange(addDays(today, -29), today);
-  const hmap = new Map(healthDays.map((h) => [h.date, h]));
-  const weights = last30.map((d) => ({ d, v: hmap.get(d)?.weight ?? null })).filter((x) => x.v != null) as { d: string; v: number }[];
-  const sleeps = last30.map((d) => ({ d, v: hmap.get(d)?.sleepHours ?? 0 }));
-  const weeks = Array.from({ length: 8 }, (_, i) => addDays(weekStart(today), -7 * (7 - i)));
-  const wPerWeek = weeks.map((w) => workouts.filter((x) => x.date >= w && x.date <= addDays(w, 6)).length);
-  const setsPerWeek = weeks.map((w) => trainingWeek(workouts, prefs, w).sets);
-  const pTarget = proteinTargetOf(prefs, healthDays);
-  const last14 = dateRange(addDays(today, -13), today);
-  const recentMeals = meals.filter((m) => m.date >= addDays(today, -6));
-  const qCount = (q: MealQuality) => recentMeals.filter((m) => m.quality === q).length;
-  const sleepAvg = sleeps.filter((s) => s.v).reduce((n, s, _, a) => n + s.v / a.length, 0);
 
   return (
     <div className="page">
@@ -163,8 +149,6 @@ export default function Health() {
         </ul>
       </section>
 
-      <TrainingCard date={date} />
-
       <ProteinCard date={date} />
 
       <section className="card">
@@ -202,115 +186,10 @@ export default function Health() {
         </div>
       </section>
 
-      <section className="card">
-        <h2>Trends</h2>
-        <div className="grid-2 trends">
-          <div>
-            <h3>Weight (30 days)</h3>
-            {weights.length >= 2 ? <LineChart points={weights} /> : <Empty>Log your weight a few times to see the trend.</Empty>}
-          </div>
-          <div>
-            <h3>Sleep · avg {sleepAvg ? `${sleepAvg.toFixed(1)}h` : "–"}</h3>
-            <div className="bars small-bars">
-              {sleeps.map((s) => (
-                <div key={s.d} className="bar-col" title={`${s.d}: ${s.v}h`}>
-                  <div className="bar-fill" style={{ height: `${(s.v / 10) * 100}%`, background: s.v >= 7 ? "var(--ok)" : s.v ? "#f59e0b" : "transparent" }} />
-                </div>
-              ))}
-            </div>
-          </div>
-          <div>
-            <h3>Water (30 days) · goal {prefs.waterGoalL ?? 3} L</h3>
-            <div className="bars small-bars">
-              {last30.map((d) => {
-                const ml = waterMl(hmap.get(d));
-                const goal = (prefs.waterGoalL ?? 3) * 1000;
-                return (
-                  <div key={d} className="bar-col" title={`${d}: ${fmtL(ml)}`}>
-                    <div className="bar-fill" style={{ height: `${Math.min(100, (ml / (goal * 1.3)) * 100)}%`, background: ml >= goal ? "#0ea5e9" : ml ? "#7dd3fc" : "transparent" }} />
-                  </div>
-                );
-              })}
-            </div>
-          </div>
-          <div>
-            <h3>Hard sets per week · target {(prefs.setsTarget ?? DEFAULT_SETS_TARGET) * musclesOf(prefs).length}</h3>
-            <div className="bars small-bars">
-              {setsPerWeek.map((n, i) => (
-                <div key={i} className="bar-col" title={`Week of ${weeks[i]}: ${n} sets · ${wPerWeek[i]} sessions`}>
-                  <div className="bar-val">{n || ""}</div>
-                  <div className="bar-fill" style={{ height: `${(n / Math.max((prefs.setsTarget ?? DEFAULT_SETS_TARGET) * musclesOf(prefs).length, ...setsPerWeek)) * 100}%`, background: "var(--ok)" }} />
-                </div>
-              ))}
-            </div>
-            {!setsPerWeek.some(Boolean) && <p className="muted tiny">Add exercises (sets × reps) to your workouts to fill this.</p>}
-          </div>
-          <div>
-            <h3>Protein per day (14 days) · target {pTarget} g</h3>
-            <div className="bars small-bars">
-              {last14.map((d) => {
-                const g = proteinOn(d, meals);
-                return (
-                  <div key={d} className="bar-col" title={`${d}: ${g} g`}>
-                    <div className="bar-fill" style={{ height: `${Math.min(100, (g / (pTarget * 1.3)) * 100)}%`, background: g >= pTarget ? "var(--ok)" : g ? "#f59e0b" : "transparent" }} />
-                  </div>
-                );
-              })}
-            </div>
-          </div>
-          <div>
-            <h3>Eating (last 7 days)</h3>
-            {recentMeals.length ? (
-              <>
-                <div className="stackbar">
-                  {(Object.keys(Q) as MealQuality[]).map((q) => (
-                    <div key={q} style={{ flex: qCount(q), background: q === "great" ? "#10b981" : q === "ok" ? "#eab308" : "#ef4444" }} />
-                  ))}
-                </div>
-                <p className="muted small">
-                  {Math.round((qCount("great") / recentMeals.length) * 100)}% healthy · {recentMeals.length} meals · 
-                  {qCount("junk")} junk
-                </p>
-              </>
-            ) : (
-              <Empty>No meals logged this week.</Empty>
-            )}
-          </div>
-        </div>
-      </section>
+      <HealthTrends />
 
       {editingWorkout && <WorkoutEditor w={editingWorkout} onClose={() => setEditingWorkout(null)} />}
       {editingMeal && <MealEditor meal={editingMeal} onClose={() => setEditingMeal(null)} />}
-    </div>
-  );
-}
-
-function LineChart({ points }: { points: { d: string; v: number }[] }) {
-  const W = 300;
-  const H = 110;
-  const min = Math.min(...points.map((p) => p.v));
-  const max = Math.max(...points.map((p) => p.v));
-  const pad = (max - min) * 0.15 || 1;
-  const lo = min - pad;
-  const hi = max + pad;
-  const xs = (i: number) => (i / (points.length - 1)) * (W - 20) + 10;
-  const ys = (v: number) => H - 10 - ((v - lo) / (hi - lo)) * (H - 20);
-  const path = points.map((p, i) => `${i ? "L" : "M"}${xs(i).toFixed(1)},${ys(p.v).toFixed(1)}`).join(" ");
-  const diff = points[points.length - 1].v - points[0].v;
-  return (
-    <div>
-      <svg viewBox={`0 0 ${W} ${H}`} className="line-chart">
-        <path d={path} fill="none" stroke="var(--accent)" strokeWidth="2.5" strokeLinejoin="round" />
-        {points.map((p, i) => (
-          <circle key={p.d} cx={xs(i)} cy={ys(p.v)} r="3" fill="var(--accent)">
-            <title>{`${p.d}: ${p.v}`}</title>
-          </circle>
-        ))}
-      </svg>
-      <p className="muted small">
-        {points[points.length - 1].v} kg · {diff >= 0 ? "+" : ""}
-        {diff.toFixed(1)} kg over {points.length} weigh-ins
-      </p>
     </div>
   );
 }
@@ -496,7 +375,7 @@ function WorkoutEditor({ w: initial, onClose }: { w: Workout; onClose: () => voi
             <option key={n} value={n} />
           ))}
         </datalist>
-        {w.exercises.length > 0 && <div className="muted tiny">sets × reps · kg (0 = bodyweight). Hard sets count toward each muscle's weekly volume.</div>}
+        {w.exercises.length > 0 && <div className="muted tiny">sets × reps · kg (0 = bodyweight)</div>}
       </div>
       <label>
         Notes
@@ -565,81 +444,6 @@ function MealEditor({ meal, onClose }: { meal: Meal; onClose: () => void }) {
         </button>
       </div>
     </Modal>
-  );
-}
-
-function TrainingCard({ date }: { date: string }) {
-  const { prefs, setPrefs } = useStore();
-  const workouts = useList("workouts");
-  const wk = weekStart(date);
-  const tw = trainingWeek(workouts, prefs, wk);
-  const target = prefs.setsTarget ?? DEFAULT_SETS_TARGET;
-  const prs = personalRecords(workouts).slice(0, 6);
-  const weeks = Array.from({ length: 8 }, (_, i) => addDays(wk, -7 * (7 - i)));
-  const hit = weeks.filter((w) => trainingWeek(workouts, prefs, w).sessions >= 3).length;
-  const max = Math.max(target * 2, ...tw.perMuscle.values());
-  return (
-    <section className="card">
-      <div className="card-head">
-        <h2>🥋 Training this week</h2>
-        <span className="chip ok" title="Weeks with 3+ sessions, out of the last 8">
-          {hit}/8 weeks with 3+ sessions
-        </span>
-      </div>
-      <div className="grid-2">
-        <div>
-          <h3>Hard sets per muscle · target {target}+</h3>
-          {[...tw.perMuscle.entries()].map(([m, n]) => (
-            <div key={m} className="muscle-row">
-              <div className="row between small">
-                <span>{m}</span>
-                <b>{n}</b>
-              </div>
-              <div className="bar thin target-bar">
-                <div style={{ width: `${Math.min(100, (n / max) * 100)}%`, background: n >= target ? "var(--ok)" : n ? "var(--warn)" : "transparent" }} />
-                <i style={{ left: `${(target / max) * 100}%` }} />
-              </div>
-            </div>
-          ))}
-          <p className="muted tiny">
-            {tw.sessions} session{tw.sessions === 1 ? "" : "s"} · {tw.sets} hard sets. Around 10+ hard sets per muscle a week grows more muscle (Schoenfeld 2017).
-          </p>
-          {tw.unknown.length > 0 && (
-            <div className="small">
-              <span className="muted">Which muscle?</span>
-              {tw.unknown.slice(0, 6).map((name) => (
-                <div key={name} className="row">
-                  <span className="grow">{name}</span>
-                  <select value={muscleFor(name, prefs) ?? ""} onChange={(e) => setPrefs({ exerciseMuscles: { ...(prefs.exerciseMuscles ?? {}), [name.toLowerCase()]: e.target.value } })}>
-                    <option value="">choose…</option>
-                    {musclesOf(prefs).map((m) => (
-                      <option key={m} value={m}>
-                        {m}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-              ))}
-            </div>
-          )}
-        </div>
-        <div>
-          <h3>🏆 PR board</h3>
-          {!prs.length && <Empty>Log exercises with reps (and kg) in a workout. Your best sets show up here.</Empty>}
-          {prs.map((p) => (
-            <div key={p.name} className="pr-row">
-              <div className="row between small">
-                <span>
-                  {p.name} {p.date >= addDays(todayStr(), -6) && <span className="chip ok">NEW PR</span>}
-                </span>
-                <b>{p.weight ? `${p.weight} kg × ${p.reps}` : `${p.reps} reps`}</b>
-              </div>
-              <div className="muted tiny">Next time try: {nextTarget(p)}</div>
-            </div>
-          ))}
-        </div>
-      </div>
-    </section>
   );
 }
 
