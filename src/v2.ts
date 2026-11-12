@@ -2,7 +2,7 @@
 // derived stats (training volume, PRs, protein, battles, Things).
 import { useMemo } from "react";
 import { useList, useStore } from "./store";
-import type { Battle, Entry, HealthDay, Meal, PillarDef, Prefs, Tag, Thing, Timer, Urge, Workout } from "./types";
+import type { Data, Battle, Entry, HealthDay, Meal, PillarDef, Prefs, Tag, Thing, Timer, Urge, Workout } from "./types";
 import { addDays, todayStr, weekStart } from "./dates";
 
 export const DEFAULT_PENALTY = 40;
@@ -24,12 +24,14 @@ const yearStartStr = () => `${new Date().getFullYear()}-01-01`;
 export const DEFAULT_PILLARS: PillarDef[] = [
   { id: "body", label: "Body", emoji: "🥋", color: "#f43f5e", source: "body", target: 365 },
   { id: "wealth", label: "Wealth", emoji: "💰", color: "#fbbf24", source: "money", target: 100000, current: 0 },
-  { id: "mind", label: "Mind", emoji: "🧘", color: "#38bdf8", source: "mind", target: 365 },
+  { id: "mind", label: "Mind", emoji: "🧘", color: "#38bdf8", source: "mind", target: 900 },
 ];
 /** Fill in targets for pillars saved by earlier builds. */
 function withDefaults(p: PillarDef): PillarDef {
   const q = p.id === "wealth" && p.source === "quest" && !p.questId ? { ...p, source: "money" as const } : p;
   if (q.source === "money") return { target: 100000, current: 0, ...q };
+  // Mind goal default went from 365 to 900 points (≈ a full year at 2–3 points a day), unless you set it yourself.
+  if (q.source === "mind" && q.target === 365 && !q.targetEdited) return withDefaults({ ...q, target: 900 });
   if (q.source === "body" || q.source === "mind") return { target: 365, start: yearStartStr(), ...q, ...(q.start ? {} : { start: yearStartStr() }) };
   return q;
 }
@@ -40,7 +42,6 @@ export const DASH_CARDS: { id: string; label: string }[] = [
   { id: "now", label: "What are you doing now?" },
   { id: "quests", label: "⚔️ Active quests" },
   { id: "waste", label: "⏳ Time I could have said NO to" },
-  { id: "mind", label: "🧘 Mind check" },
   { id: "vision", label: "🌌 Vision board" },
   { id: "learn", label: "🖋️ What did I learn today?" },
 ];
@@ -236,4 +237,74 @@ export function useRenameThing() {
     const timer = data.meta.timer as Timer | undefined;
     if (timer && !timer.del && timer.project && thingKey(timer.project) === k) put("meta", { ...timer, project: nt });
   };
+}
+
+// ---------- Mind pillar ----------
+
+/** Points that grow the Mind bar. Slips never subtract: a lapse resets "days clean", not your progress. */
+export const MIND_POINTS = { study: 1, learned: 1, atlasIdea: 1, book: 5, executed: 3, surfed: 2, cleanDay: 1, reduceWeek: 5 } as const;
+
+export function mindPoints(d: Data, from: string, today = todayStr()) {
+  const alive = <T extends { del?: boolean }>(r: Record<string, T> | undefined) => Object.values(r ?? {}).filter((x) => !x.del);
+  const learned = alive(d.journal).filter((j) => j.date >= from && j.learned?.trim()).length;
+  const atlasIdeas = alive(d.ideas).filter((i) => i.date >= from).length;
+  const books = alive(d.library).filter((b) => b.status === "done" && b.finishedAt && b.finishedAt >= from).length;
+  const executed = alive(d.sparks).filter((s) => s.done && s.doneAt && s.doneAt >= from).length;
+  const urges = alive(d.urges);
+  const surfed = urges.filter((u) => u.date >= from && u.kind === "urge" && u.outcome === "surfed").length;
+  const tags = new Map(alive(d.tags).map((t) => [t.id, t]));
+  const entries = alive(d.entries);
+  // Study days: 15+ min logged on Mind & Learning tags (Reading, Learning…) count automatically.
+  const studyMins = new Map<string, number>();
+  for (const e of entries) {
+    if (e.date < from || tags.get(e.tagId)?.area !== "mind" || (e.wasted ?? tags.get(e.tagId)?.wasted)) continue;
+    studyMins.set(e.date, (studyMins.get(e.date) ?? 0) + Math.max(0, e.end - e.start));
+  }
+  const study = [...studyMins.values()].filter((m) => m >= 15).length;
+  let cleanDays = 0;
+  let reduceWeeks = 0;
+  for (const b of alive(d.battles)) {
+    const start = b.startDate > from ? b.startDate : from;
+    if (b.kind === "quit") {
+      // Every finished day without a slip counts.
+      const slipDays = new Set(urges.filter((u) => u.battleId === b.id && u.outcome === "gave").map((u) => u.date));
+      for (let x = start; x < today; x = addDays(x, 1)) if (!slipDays.has(x)) cleanDays++;
+    } else if (b.weeklyLimitMins > 0) {
+      // Every finished week at or under the limit counts.
+      for (let w = weekStart(start) < start ? addDays(weekStart(start), 7) : weekStart(start); addDays(w, 6) < today; w = addDays(w, 7)) {
+        const mins = entries
+          .filter((e) => e.date >= w && e.date <= addDays(w, 6) && (b.tagIds.length ? b.tagIds.includes(e.tagId) : (e.wasted ?? tags.get(e.tagId)?.wasted)))
+          .reduce((n, e) => n + Math.max(0, e.end - e.start), 0);
+        if (mins <= b.weeklyLimitMins) reduceWeeks++;
+      }
+    }
+  }
+  const P = MIND_POINTS;
+  const parts = [
+    { label: "📖 Things learned", n: learned, pts: learned * P.learned },
+    { label: "📚 Study days (15+ min reading / learning)", n: study, pts: study * P.study },
+    { label: "🌌 Atlas ideas", n: atlasIdeas, pts: atlasIdeas * P.atlasIdea },
+    { label: "📚 Books finished", n: books, pts: books * P.book },
+    { label: "💡 Ideas executed", n: executed, pts: executed * P.executed },
+    { label: "🌊 Urges ridden out", n: surfed, pts: surfed * P.surfed },
+    { label: "⚔️ Clean days (quit battles)", n: cleanDays, pts: cleanDays * P.cleanDay },
+    { label: "📉 Weeks under limit (reduce battles)", n: reduceWeeks, pts: reduceWeeks * P.reduceWeek },
+  ];
+  return { parts, total: parts.reduce((n, p) => n + p.pts, 0) };
+}
+
+// ---------- Wealth pillar ----------
+
+/** Money from quests: sums what you logged in $ quests since `from` ("latest" quests like MRR count their latest value). */
+export function questMoney(d: Data, pick: "all" | "none" | string[] | undefined, from: string) {
+  const sel = pick ?? "all";
+  if (sel === "none") return { total: 0, parts: [] as { title: string; amount: number }[] };
+  const goals = Object.values(d.goals ?? {}).filter((g) => !g.del && g.metric && g.metric.unit === "$" && (sel === "all" || sel.includes(g.id)));
+  const logs = Object.values(d.goalLogs ?? {}).filter((l) => !l.del && l.date >= from);
+  const parts = goals.map((g) => {
+    const mine = logs.filter((l) => l.goalId === g.id).sort((a, b) => a.date.localeCompare(b.date));
+    const amount = g.metric!.mode === "latest" ? (mine[mine.length - 1]?.value ?? 0) : mine.reduce((n, l) => n + l.value, 0);
+    return { title: g.title, amount };
+  });
+  return { total: parts.reduce((n, p) => n + p.amount, 0), parts };
 }

@@ -1,20 +1,19 @@
 import { useEffect, useRef, useState } from "react";
 import { useList, useStore } from "../store";
 import type { PillarDef } from "../types";
-import { useIndex } from "../game";
 import { fmtVal, questState } from "../quest";
-import { Modal } from "../ui";
-import { DASH_CARDS, DEFAULT_PILLARS, dashLayout, pillarsOf } from "../v2";
+import { celebrate, Modal } from "../ui";
+import { todayStr } from "../dates";
+import { DASH_CARDS, DEFAULT_PILLARS, dashLayout, mindPoints, pillarsOf, questMoney } from "../v2";
 
 /** Progress of one pillar: 0–1 plus a hover hint (the bar itself shows no numbers). */
 export function usePillarValue() {
-  const ix = useIndex();
+  const { data } = useStore();
   const workouts = useList("workouts");
   const goals = useList("goals");
   const goalLogs = useList("goalLogs");
   const tasks = useList("tasks");
-  const urges = useList("urges");
-  return (p: PillarDef): { frac: number; hint: string } => {
+  return (p: PillarDef): { frac: number; hint: string; parts?: { label: string; n: number; pts: number }[] } => {
     const target = Math.max(1, p.target ?? 1);
     if (p.source === "quest") {
       const g = goals.find((x) => x.id === p.questId) ?? goals.find((x) => !x.done);
@@ -24,17 +23,22 @@ export function usePillarValue() {
       return { frac: st.frac, hint: `${g.title}: ${v(st.current)} / ${v(st.target)}` };
     }
     if (p.source === "money") {
-      const cur = p.current ?? 0;
-      return { frac: cur / target, hint: `${fmtVal(cur, "$")} / ${fmtVal(target, "$")}` };
+      const manual = p.current ?? 0;
+      const q = questMoney(data, p.moneyQuests, p.start ?? "0000");
+      const cur = manual + q.total;
+      return {
+        frac: cur / target,
+        hint: `${fmtVal(cur, "$")} / ${fmtVal(target, "$")}`,
+        parts: [{ label: "✍️ Typed in by you", n: 1, pts: manual }, ...q.parts.map((x) => ({ label: `⚔️ Quest: ${x.title}`, n: 1, pts: x.amount }))],
+      };
     }
     const from = p.start ?? "0000";
     if (p.source === "body") {
       const n = workouts.filter((w) => w.date >= from).length;
       return { frac: n / target, hint: `${n} / ${target} workouts since ${from}` };
     }
-    const learned = [...ix.journal.values()].filter((j) => j.date >= from && j.learned?.trim()).length;
-    const surfed = urges.filter((u) => u.date >= from && u.kind === "urge" && u.outcome === "surfed").length;
-    return { frac: (learned + surfed) / target, hint: `${learned} things learned + ${surfed} urges surfed = ${learned + surfed} / ${target} since ${from}` };
+    const m = mindPoints(data, from);
+    return { frac: m.total / target, hint: `${m.total} / ${target} points since ${from}`, parts: m.parts };
   };
 }
 
@@ -43,6 +47,7 @@ export function PillarsBar() {
   const { prefs } = useStore();
   const value = usePillarValue();
   const [edit, setEdit] = useState<number | null>(null);
+  const [learn, setLearn] = useState(false);
   const pillars = pillarsOf(prefs);
   return (
     <div className="pillars">
@@ -52,6 +57,11 @@ export function PillarsBar() {
           <button key={p.id} className="pillar" title={v.hint} onClick={() => setEdit(i)}>
             <span className="pillar-name">
               {p.emoji} {p.label}
+              {p.source === "mind" && (
+                <span className="pillar-add" role="button" title="I learned something" onClick={(e) => { e.stopPropagation(); setLearn(true); }}>
+                  ＋
+                </span>
+              )}
             </span>
             <div className="bar thin">
               <div style={{ width: `${Math.min(100, Math.max(0, v.frac) * 100)}%`, background: p.color }} />
@@ -59,6 +69,7 @@ export function PillarsBar() {
           </button>
         );
       })}
+      {learn && <LearnedModal onClose={() => setLearn(false)} />}
       {edit != null && (
         <Modal title={`${pillars[edit].emoji} ${pillars[edit].label}`} onClose={() => setEdit(null)}>
           <PillarFields i={edit} />
@@ -67,6 +78,70 @@ export function PillarsBar() {
           </button>
         </Modal>
       )}
+    </div>
+  );
+}
+
+/** Quick "I learned something": adds a line to today's "What did I learn today?". */
+function LearnedModal({ onClose }: { onClose: () => void }) {
+  const { data, put } = useStore();
+  const [text, setText] = useState("");
+  const today = todayStr();
+  const j = data.journal[today] && !data.journal[today].del ? data.journal[today] : null;
+  const save = () => {
+    const t = text.trim();
+    if (!t) return;
+    const learned = j?.learned?.trim() ? `${j.learned.trim()}\n• ${t}` : `• ${t}`;
+    put("journal", { id: today, date: today, learned, grateful: j?.grateful ?? "", thoughts: j?.thoughts ?? "" });
+    celebrate(j?.learned?.trim() ? "Added to today's learnings" : "Learned something today · Mind +1", "📖");
+    onClose();
+  };
+  return (
+    <Modal title="📖 I learned something" onClose={onClose}>
+      <textarea autoFocus rows={3} placeholder="One idea, lesson or insight…" value={text} onChange={(e) => setText(e.target.value)} onKeyDown={(e) => e.key === "Enter" && (e.metaKey || e.ctrlKey) && save()} />
+      <p className="muted tiny">Saved in "What did I learn today?" (Journal). Counts once per day for the Mind bar.</p>
+      <button className="btn primary" disabled={!text.trim()} onClick={save}>
+        Save
+      </button>
+    </Modal>
+  );
+}
+
+/** Which $ quests add their logged money to the Wealth bar. */
+function MoneyQuestPicker({ p, set, goals }: { p: PillarDef; set: (patch: Partial<PillarDef>) => void; goals: { id: string; title: string; metric?: { unit: string } }[] }) {
+  const money = goals.filter((g) => g.metric?.unit === "$");
+  const sel = p.moneyQuests ?? "all";
+  const picked = (id: string) => sel === "all" || (Array.isArray(sel) && sel.includes(id));
+  return (
+    <div className="small">
+      <div className="muted">Add money logged in quests:</div>
+      <div className="row wrap">
+        <button className={`btn small ${sel === "all" ? "primary" : ""}`} onClick={() => set({ moneyQuests: "all" })}>
+          All $ quests (also future ones)
+        </button>
+        <button className={`btn small ${sel === "none" ? "primary" : ""}`} onClick={() => set({ moneyQuests: "none" })}>
+          None, only what I type
+        </button>
+      </div>
+      {money.length > 0 && (
+        <div className="row wrap" style={{ marginTop: 4 }}>
+          <span className="muted">or pick:</span>
+          {money.map((g) => (
+            <label key={g.id} className="row">
+              <input
+                type="checkbox"
+                checked={picked(g.id)}
+                onChange={(e) => {
+                  const cur = sel === "all" ? money.map((x) => x.id) : sel === "none" ? [] : sel;
+                  set({ moneyQuests: e.target.checked ? [...new Set([...cur, g.id])] : cur.filter((x) => x !== g.id) });
+                }}
+              />
+              {g.title}
+            </label>
+          ))}
+        </div>
+      )}
+      <div className="muted tiny">Monthly/total quests add up every amount you logged; "latest" quests (like MRR) count their latest value.</div>
     </div>
   );
 }
@@ -94,8 +169,8 @@ function PillarFields({ i }: { i: number }) {
           }}
         >
           <option value="body">Counts workouts</option>
-          <option value="mind">Counts things learned + urges surfed</option>
-          <option value="money">Money: amount I have ($)</option>
+          <option value="mind">Mind points: learning, ideas executed, battles won</option>
+          <option value="money">Money: typed in + earned in quests ($)</option>
           <option value="q:">Follows a quest (first open one)</option>
           {goals.map((g) => (
             <option key={g.id} value={`q:${g.id}`}>
@@ -108,23 +183,51 @@ function PillarFields({ i }: { i: number }) {
         <div className="row wrap">
           {p.source === "money" && (
             <label>
-              I have now ($)
+              Extra money I add myself ($)
               <input type="number" min={0} value={p.current ?? ""} onChange={(e) => set({ current: num(e.target.value) })} style={{ width: 140 }} />
             </label>
           )}
           <label>
-            Goal {p.source === "money" ? "($)" : p.source === "body" ? "(workouts)" : "(learnings + urges)"}
-            <input type="number" min={1} value={p.target ?? ""} onChange={(e) => set({ target: num(e.target.value) })} style={{ width: 140 }} />
+            Goal {p.source === "money" ? "($)" : p.source === "body" ? "(workouts)" : "(points)"}
+            <input type="number" min={1} value={p.target ?? ""} onChange={(e) => set({ target: num(e.target.value), targetEdited: true })} style={{ width: 140 }} />
           </label>
-          {(p.source === "body" || p.source === "mind") && (
+          {(p.source === "body" || p.source === "mind" || p.source === "money") && (
             <label>
-              Count from
-              <input type="date" value={p.start ?? ""} onChange={(e) => e.target.value && set({ start: e.target.value })} />
+              {p.source === "money" ? "Count quest money from (empty = all time)" : "Count from"}
+              <input type="date" value={p.start ?? ""} onChange={(e) => (e.target.value ? set({ start: e.target.value }) : p.source === "money" && set({ start: undefined }))} />
             </label>
           )}
         </div>
       )}
       <p className="muted tiny">{value(p).hint}</p>
+      {p.source === "money" && <MoneyQuestPicker p={p} set={set} goals={goals} />}
+      {p.source === "money" && (
+        <div className="mind-breakdown">
+          {value(p).parts?.map((x) => (
+            <div key={x.label} className="row between small">
+              <span>{x.label}</span>
+              <b>{fmtVal(x.pts, "$")}</b>
+            </div>
+          ))}
+          <div className="row between small">
+            <span>= Total</span>
+            <b>{value(p).hint}</b>
+          </div>
+        </div>
+      )}
+      {p.source === "mind" && (
+        <div className="mind-breakdown">
+          {value(p).parts?.map((x) => (
+            <div key={x.label} className="row between small">
+              <span>{x.label}</span>
+              <span className="muted">
+                {x.n} × {x.n ? x.pts / x.n : "–"} = <b>{x.pts}</b>
+              </span>
+            </div>
+          ))}
+          <p className="muted tiny">Points per item: learned 1 · study day 1 · Atlas idea 1 · book 5 · idea executed 3 · urge ridden out 2 · clean day 1 · week under limit 5. Slips never take points away.</p>
+        </div>
+      )}
     </div>
   );
 }

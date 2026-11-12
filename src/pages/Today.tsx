@@ -15,7 +15,6 @@ import { fmtVal, questState } from "../quest";
 import { useSync } from "../sync";
 import { downloadBackup } from "../backup";
 import { WasteCard } from "../components/WasteCard";
-import { MindCheckCard } from "../components/MindCheck";
 import { CustomizeDash, PillarsBar, VisionCard } from "../components/Dashboard";
 import { dashLayout } from "../v2";
 
@@ -253,7 +252,6 @@ export default function Today({ go }: { go: Go }) {
       </>
     ) : null,
     waste: <WasteCard go={go} />,
-    mind: <MindCheckCard />,
     vision: <VisionCard />,
     learn: (
       <section className="card">

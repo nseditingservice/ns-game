@@ -332,9 +332,12 @@ export interface PillarDef {
   color: string;
   source: "body" | "mind" | "quest" | "money";
   questId?: string;
-  target?: number; // body: workouts · mind: learnings + urges surfed · money: $
+  target?: number; // body: workouts · mind: points · money: $
+  targetEdited?: boolean; // the player set the goal themselves
   start?: string; // count from this date (body / mind)
-  current?: number; // money: where you are now ($)
+  current?: number; // money: amount you type in yourself ($)
+  /** money: also add money logged in quests. "all" = every $ quest, now and future. Default "all". */
+  moneyQuests?: "all" | "none" | string[];
 }
 
 /** Looks for a "Thing" (what used to be called a project). Keyed by name; entries keep storing the name. */
