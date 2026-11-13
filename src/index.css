@@ -836,3 +836,24 @@ button.chip { cursor: pointer; }
 }
 .emoji-paste { border: 1px dashed var(--accent); background: var(--accent-soft); }
 .emoji-paste::placeholder { color: var(--muted); }
+/* 30 year mission: small life-in-weeks grid in the dashboard header */
+.page-head:has(.mission) { align-items: flex-start; flex-wrap: nowrap; }
+.page-head:has(.mission) > div:first-child { flex: 1; min-width: 0; }
+.head-pillars { max-width: none; }
+.mission { width: 300px; flex-shrink: 0; margin-right: 34px; }
+.mission-head { display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 6px; }
+.mission .mission-kicker { font-size: 0.66rem; }
+.mission .mission-num { font-size: 1.15rem; }
+.mission .mission-sub { font-size: 0.72rem; color: var(--muted); }
+.mission-grid { display: grid; grid-template-columns: repeat(52, 1fr); gap: 1.5px; }
+.mission-grid i { aspect-ratio: 1; border-radius: 1px; display: block; background: rgb(255 255 255 / 0.07); }
+.mission-grid i.past { background: linear-gradient(45deg, transparent 38%, #d8ccff 38%, #d8ccff 62%, transparent 62%), linear-gradient(-45deg, transparent 38%, #d8ccff 38%, #d8ccff 62%, transparent 62%), #4f4a80; }
+.mission-grid i.now { background: var(--ok); box-shadow: 0 0 5px var(--ok); }
+.mission-grid i.decade { margin-top: 3px; }
+.mission-foot { display: flex; justify-content: space-between; font-size: 0.62rem; color: var(--muted); margin-top: 4px; }
+.mission-now-dot { display: inline-block; width: 7px; height: 7px; border-radius: 2px; background: var(--ok); vertical-align: 0; }
+@media (max-width: 800px) {
+  .page-head:has(.mission) { flex-wrap: wrap; }
+  .mission { width: 100%; margin: 12px 0 0; }
+}
+.mission-head > span:last-child { white-space: nowrap; }

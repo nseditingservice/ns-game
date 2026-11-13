@@ -3,7 +3,7 @@ import { useList, useStore } from "../store";
 import type { PillarDef } from "../types";
 import { fmtVal, questState } from "../quest";
 import { celebrate, Modal, lastEmoji } from "../ui";
-import { fmtDay, todayStr } from "../dates";
+import { todayStr } from "../dates";
 import { DASH_CARDS, DEFAULT_PILLARS, dashLayout, lifeWeeks, mindPoints, pillarsOf, questMoney } from "../v2";
 
 /** Progress of one pillar: 0–1 plus a hover hint (the bar itself shows no numbers). */
@@ -390,69 +390,31 @@ export function CustomizeDash({ onClose }: { onClose: () => void }) {
 
 // ---------- Life in weeks ----------
 
-/** Small "weeks left" text on the right of the dashboard header. Tap for the full grid. */
+/** Your life in weeks, right on the dashboard: every finished week is crossed off automatically. */
 export function MissionBadge() {
   const { prefs } = useStore();
-  const [open, setOpen] = useState(false);
   const w = lifeWeeks(prefs);
+  const startYear = Number(w.birth.slice(0, 4));
   return (
-    <>
-      <button className="mission-badge" onClick={() => setOpen(true)} title="Each week of your life, crossed off automatically">
-        <span className="mission-kicker">Your {w.years}-year mission</span>
-        <span className="mission-num">{w.left.toLocaleString("en-US")}</span>
-        <span className="mission-sub">weeks left</span>
-      </button>
-      {open && <LifeModal onClose={() => setOpen(false)} />}
-    </>
-  );
-}
-
-function LifeModal({ onClose }: { onClose: () => void }) {
-  const { prefs } = useStore();
-  const w = lifeWeeks(prefs);
-  const fmt = (d: string) => fmtDay(d, { day: "numeric", month: "short", year: "numeric" });
-  return (
-    <Modal title={`⏳ Your ${w.years}-year mission`} onClose={onClose}>
-      <p className="muted small">
-        Born {fmt(w.birth)} · mission ends {fmt(w.end)} · each box is one week, crossed off automatically when it ends. Change your birthday in Settings.
-      </p>
-      <div className="mini-stats">
-        <div>
-          <b>{w.lived.toLocaleString("en-US")}</b>
-          <span>weeks gone ✕</span>
-        </div>
-        <div>
-          <b className="up">{w.left.toLocaleString("en-US")}</b>
-          <span>weeks left</span>
-        </div>
-        <div>
-          <b>{((w.lived / w.total) * 100).toFixed(1)}%</b>
-          <span>of the mission used</span>
-        </div>
-      </div>
-      <div className="life-grid">
-        {w.rows.map((row, r) => (
-          <div key={r} className={`life-row ${r && r % 10 === 0 ? "decade" : ""}`}>
-            <span className="life-year">{r % 5 === 0 || r === w.years - 1 ? Number(w.birth.slice(0, 4)) + r : ""}</span>
-            {row.map((s, c) => (
-              <i key={c} className={s}>
-                {s === "past" ? "✕" : ""}
-              </i>
-            ))}
-          </div>
-        ))}
-      </div>
-      <div className="legend small muted">
+    <div className="mission" title={`Born ${w.birth} · ${w.lived.toLocaleString("en-US")} weeks gone · ${w.left} weeks left · change your birthday in Settings`}>
+      <div className="mission-head">
+        <span className="mission-kicker">{w.years} year mission</span>
         <span>
-          <i className="past">✕</i> gone
-        </span>
-        <span>
-          <i className="now" /> this week
-        </span>
-        <span>
-          <i className="future" /> still yours to use
+          <b className="mission-num">{w.left.toLocaleString("en-US")}</b> <span className="mission-sub">weeks left</span>
         </span>
       </div>
-    </Modal>
+      <div className="mission-grid">
+        {w.rows.map((row, r) =>
+          row.map((st, c) => <i key={`${r}-${c}`} className={`${st}${r && r % 10 === 0 ? " decade" : ""}`} />),
+        )}
+      </div>
+      <div className="mission-foot">
+        <span>{startYear}</span>
+        <span>
+          ✕ gone · <span className="mission-now-dot" /> this week
+        </span>
+        <span>{startYear + w.years}</span>
+      </div>
+    </div>
   );
 }
