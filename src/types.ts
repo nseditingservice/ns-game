@@ -323,6 +323,8 @@ export interface Prefs extends Rec {
   top4By?: "things" | "tags";
   top4Hidden?: string[];
   urgeTriggers?: string[];
+  birthDate?: string; // YYYY-MM-DD, for "weeks left"
+  missionYears?: number; // length of the life mission (default 30)
 }
 
 export interface PillarDef {

@@ -805,3 +805,34 @@ button.chip { cursor: pointer; }
 .mind-breakdown { background: var(--panel-2); border-radius: 10px; padding: 8px 10px; display: flex; flex-direction: column; gap: 3px; }
 .pillar-add { margin-left: 6px; display: inline-grid; place-items: center; width: 18px; height: 18px; border-radius: 6px; background: var(--accent-soft); color: var(--accent); font-size: 0.75rem; font-weight: 800; vertical-align: middle; }
 .pillar-add:hover { background: var(--accent); color: white; }
+/* Header: pillars under the quote, weeks-left on the right */
+.head-pillars { margin-top: 12px; max-width: 520px; }
+.head-pillars .pillars { grid-template-columns: 1fr; gap: 7px; margin-top: 0; }
+.head-pillars .pillar { flex-direction: row; align-items: center; gap: 10px; }
+.head-pillars .pillar-name { width: 96px; flex-shrink: 0; }
+.head-pillars .pillar .bar { flex: 1; margin-top: 0; height: 7px; }
+.mission-badge { all: unset; cursor: pointer; align-self: flex-start; margin-right: 36px; display: flex; flex-direction: column; align-items: flex-end; text-align: right; padding: 4px 6px; border-radius: 12px; }
+.mission-badge:hover { background: var(--accent-soft); }
+.mission-kicker { font-size: 0.68rem; font-weight: 700; letter-spacing: 0.1em; text-transform: uppercase; color: var(--muted); }
+.mission-num { font-size: 2.6rem; font-weight: 800; line-height: 1.05; letter-spacing: -0.03em; background: linear-gradient(135deg, #fff, var(--accent)); -webkit-background-clip: text; background-clip: text; color: transparent; }
+.mission-sub { font-size: 0.85rem; color: #d4d2e8; }
+.month-label { margin-top: 12px; margin-bottom: 6px; font-size: 0.7rem; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; color: var(--accent); }
+.life-grid { display: flex; flex-direction: column; gap: 2px; overflow-x: auto; }
+.life-row { display: flex; gap: 2px; align-items: center; }
+.life-row.decade { margin-top: 5px; }
+.life-year { width: 34px; flex-shrink: 0; font-size: 0.6rem; color: var(--muted); text-align: right; padding-right: 4px; }
+.life-grid i, .legend i { width: 9px; height: 9px; flex-shrink: 0; border-radius: 2px; font-style: normal; font-size: 7px; line-height: 9px; text-align: center; font-weight: 900; display: inline-block; }
+.life-grid i.past, .legend i.past { background: #4b4770; color: #c4b5fd; }
+.life-grid i.now, .legend i.now { background: var(--ok); box-shadow: 0 0 6px var(--ok); }
+.life-grid i.future, .legend i.future { background: rgb(255 255 255 / 0.08); }
+.legend { display: flex; gap: 14px; flex-wrap: wrap; }
+.legend span { display: inline-flex; align-items: center; gap: 5px; }
+@media (max-width: 800px) { .mission-badge { margin-right: 28px; } .mission-num { font-size: 1.9rem; } .head-pillars .pillar-name { width: 80px; } }
+.modal:has(.life-grid) { width: min(760px, 100%); }
+@media (max-width: 800px) {
+  .mission-badge { flex-direction: row; flex-wrap: wrap; align-items: baseline; gap: 4px 8px; text-align: left; margin: 8px 0 0; padding: 0; }
+  .mission-kicker { width: 100%; }
+  .mission-num { font-size: 1.8rem; }
+}
+.emoji-paste { border: 1px dashed var(--accent); background: var(--accent-soft); }
+.emoji-paste::placeholder { color: var(--muted); }

@@ -124,3 +124,16 @@ export function useTimerActions() {
     },
   };
 }
+
+/** Emoji fields: keep the LAST emoji typed or pasted (so a new one replaces the old one),
+ *  and never cut multi-part emoji like 👨‍💻 or 🏳️‍🌈 in half. */
+export function lastEmoji(v: string): string {
+  const t = v.trim();
+  if (!t) return "";
+  const Seg = (Intl as unknown as { Segmenter?: new (l?: string, o?: { granularity: string }) => { segment: (s: string) => Iterable<{ segment: string }> } }).Segmenter;
+  if (Seg) {
+    const parts = [...new Seg(undefined, { granularity: "grapheme" }).segment(t)].map((x) => x.segment);
+    return parts[parts.length - 1] ?? "";
+  }
+  return [...t].slice(-2).join("");
+}

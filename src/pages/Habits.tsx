@@ -4,7 +4,7 @@ import { AREA_INFO, type Area, type Habit, type HabitLink } from "../types";
 import { addDays, dateRange, fmtDay, todayStr, weekStart } from "../dates";
 import { autoProgress, bestStreak, habitStatus, habitStreak, isScheduled, useIndex, type Index } from "../game";
 import { useHabitToggle } from "../habitActions";
-import { Modal } from "../ui";
+import { Modal, lastEmoji } from "../ui";
 import { AreaSelect } from "../components/Areas";
 import { waterTargetL } from "../water";
 import { Battles } from "./Battles";
@@ -317,7 +317,7 @@ function HabitEditor({ habit, onClose }: { habit: Habit; onClose: () => void }) 
   return (
     <Modal title={isNew ? "New habit" : "Edit habit"} onClose={onClose}>
       <div className="row">
-        <input className="emoji-input" value={h.emoji} onChange={(e) => setH({ ...h, emoji: e.target.value.slice(0, 4) })} />
+        <input className="emoji-input" value={h.emoji} onChange={(e) => setH({ ...h, emoji: lastEmoji(e.target.value) })} />
         <input className="grow" autoFocus placeholder="Habit name, e.g. Read" value={h.name} onChange={(e) => setH({ ...h, name: e.target.value })} />
       </div>
       <label>

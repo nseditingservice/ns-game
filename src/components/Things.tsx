@@ -3,7 +3,7 @@ import { PALETTE, uid, useList, useStore } from "../store";
 import type { Thing } from "../types";
 import { fmtHours } from "../dates";
 import { entryMins } from "../game";
-import { Modal } from "../ui";
+import { lastEmoji, Modal } from "../ui";
 import { thingKey, useRenameThing, useThings } from "../v2";
 
 const ICONS = ["🎬", "💼", "📈", "🏋️", "🥊", "📚", "🧠", "🧘", "💻", "🎨", "✍️", "🎮", "🏠", "❤️", "🌍", "⭐", "🚫", "🚪", "📣", "🎥", "💰", "🛠️", "📞", "✈️"];
@@ -76,7 +76,7 @@ function ThingRow({ name, mins, meta }: { name: string; mins: number; meta?: Thi
               {ic}
             </button>
           ))}
-          <input className="emoji-input" placeholder="any" onChange={(e) => e.target.value.trim() && save({ emoji: e.target.value.trim().slice(0, 4) })} />
+          <input className="emoji-input emoji-paste" aria-label="Paste any emoji" title="Paste or type any emoji" value="" onChange={(e) => { const em = lastEmoji(e.target.value); if (em) { save({ emoji: em }); setPicking(false); } }} />
         </div>
       )}
       <div className="row wrap small muted">
@@ -113,8 +113,18 @@ export function ThingIconPicker({ name, onClose }: { name: string; onClose: () =
         ))}
       </div>
       <label>
-        Or type / paste any emoji
-        <input className="emoji-input" placeholder="🙂" onKeyDown={(e) => { const v = (e.target as HTMLInputElement).value.trim(); if (e.key === "Enter" && v) pick(v.slice(0, 4)); }} onBlur={(e) => e.target.value.trim() && pick(e.target.value.trim().slice(0, 4))} />
+        Or paste / type any emoji (it's saved right away)
+        <input
+          className="emoji-input emoji-paste"
+          autoFocus
+          aria-label="Paste an emoji"
+          value=""
+          onChange={(e) => {
+            const em = lastEmoji(e.target.value);
+            if (em) pick(em);
+          }}
+        />
+        <span className="muted tiny">Windows: press Win + . (period) to open the emoji keyboard · Mac: Ctrl + Cmd + Space · iPhone: the 😀 key</span>
       </label>
     </Modal>
   );

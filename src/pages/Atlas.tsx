@@ -3,7 +3,7 @@ import { PALETTE, uid, useList, useStore } from "../store";
 import type { Domain, Entry, Idea, LibraryItem, Problem } from "../types";
 import { fmtDay, fmtHours, monthStart, todayStr } from "../dates";
 import { entryMins } from "../game";
-import { celebrate, Empty, Modal } from "../ui";
+import { celebrate, Empty, Modal, lastEmoji } from "../ui";
 
 // Mastery tiers, from Josh Kaufman's "first 20 hours" to the 10,000-hour mark.
 export const TIERS: [number, string][] = [
@@ -284,7 +284,7 @@ function DomainEditor({ domain, onClose }: { domain: Domain; onClose: () => void
   return (
     <Modal title={isNew ? "New domain" : "Edit domain"} onClose={onClose}>
       <div className="row">
-        <input className="emoji-input" value={d.emoji} onChange={(e) => setD({ ...d, emoji: e.target.value.slice(0, 4) })} />
+        <input className="emoji-input" value={d.emoji} onChange={(e) => setD({ ...d, emoji: lastEmoji(e.target.value) })} />
         <input className="grow" autoFocus placeholder="e.g. Video Editing, Philosophy, Muay Thai" value={d.name} onChange={(e) => setD({ ...d, name: e.target.value })} />
         <input type="color" value={d.color} onChange={(e) => setD({ ...d, color: e.target.value })} />
       </div>

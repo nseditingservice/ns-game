@@ -4,7 +4,7 @@ import { PALETTE, uid, useList, useStore } from "../store";
 import { AREAS, AREA_INFO, type Area, type Entry, type Tag } from "../types";
 import { addDays, addMonths, dateRange, fmtDay, fmtHours, fmtTime, monthEnd, monthStart, todayStr, weekStart, yearEnd, yearStart } from "../dates";
 import { entryMins, isWasted } from "../game";
-import { Empty, Modal } from "../ui";
+import { Empty, Modal, lastEmoji } from "../ui";
 import { EntryEditor } from "../components/EntryEditor";
 import { ThingIconPicker, ThingsEditor } from "../components/Things";
 import { thingIcon, thingKey, useThings } from "../v2";
@@ -475,7 +475,7 @@ function TagEditor({ tag, onClose }: { tag: Tag; onClose: () => void }) {
             {e}
           </button>
         ))}
-        <input className="emoji-input" value={t.emoji} onChange={(e) => setT({ ...t, emoji: e.target.value.slice(0, 4) })} title="Type any emoji" />
+        <input className="emoji-input" value={t.emoji} onChange={(e) => setT({ ...t, emoji: lastEmoji(e.target.value) })} title="Type any emoji" />
       </div>
       <div className="row wrap">
         <label className="grow">

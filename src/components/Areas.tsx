@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { PALETTE, uid, useStore } from "../store";
 import { AREAS, AREA_INFO, DEFAULT_AREAS, type AreaDef } from "../types";
-import { Modal } from "../ui";
+import { Modal, lastEmoji } from "../ui";
 
 const EMOJIS = ["💪", "🧠", "💼", "💰", "❤️", "🎮", "🌿", "🏠", "🎬", "🏛️", "🥊", "📚", "🎨", "🎵", "✍️", "🧘", "🌍", "👨‍👩‍👧", "🚀", "⚔️", "🔬", "🙏", "🍳", "✨"];
 
@@ -48,7 +48,7 @@ export function AreaEditor() {
                   {e}
                 </button>
               ))}
-              <input className="emoji-input" value={a.emoji} onChange={(e) => update(a.id, { emoji: e.target.value.slice(0, 4) })} title="Or type any emoji" />
+              <input className="emoji-input" value={a.emoji} onChange={(e) => update(a.id, { emoji: lastEmoji(e.target.value) })} title="Or type any emoji" />
             </div>
           )}
         </div>

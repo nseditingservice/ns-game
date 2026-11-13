@@ -1,7 +1,7 @@
 import { Fragment, useState, type ReactNode } from "react";
 import { useList, useStore } from "../store";
 import type { Go } from "../App";
-import { fmtDay, fmtHours, nowMins, todayStr } from "../dates";
+import { dateRange, fmtDay, fmtHours, monthEnd, monthStart, nowMins, todayStr } from "../dates";
 import { autoProgress, dayXp, entryMins, wastedMinsOn, extraXpForDay, habitStatus, habitStreak, isScheduled, titleFor, useIndex, useXp } from "../game";
 import { useHabitToggle } from "../habitActions";
 import { timerDisplay, useNow } from "../focus";
@@ -15,7 +15,7 @@ import { fmtVal, questState } from "../quest";
 import { useSync } from "../sync";
 import { downloadBackup } from "../backup";
 import { WasteCard } from "../components/WasteCard";
-import { CustomizeDash, PillarsBar, VisionCard } from "../components/Dashboard";
+import { CustomizeDash, MissionBadge, PillarsBar, VisionCard } from "../components/Dashboard";
 import { dashLayout } from "../v2";
 
 /** Always in hours: 0h · 45m → 0h 45m · 2h 40m */
@@ -46,14 +46,16 @@ export default function Today({ go }: { go: Go }) {
   const xpItems = [...xpToday.items, ...extraXpForDay(today, data)];
   const xpTodayTotal = xpItems.reduce((n, i) => n + i.xp, 0);
   const habitsToday = ix.habits.filter((h) => isScheduled(h, today));
-  const doneCount = habitsToday.filter((h) => habitStatus(h, today, ix) === "done").length;
   const entries = (ix.entriesByDate.get(today) ?? []).sort((a, b) => a.start - b.start);
   const tracked = entries.reduce((n, e) => n + entryMins(e), 0);
   const awake = Math.max(0, Math.min(nowMins(), prefs.dayEnd * 60) - prefs.dayStart * 60);
-  const tasksDoneToday = tasks.filter((t) => t.done && t.doneAt?.slice(0, 10) === today).length;
-  const focusToday = entries.filter((e) => e.source === "focus").reduce((n, e) => n + entryMins(e), 0);
+  // This month (resets on the 1st)
+  const monthDays = dateRange(monthStart(today), today);
+  const daysLeftInMonth = dateRange(today, monthEnd(today)).length - 1;
+  const tasksDoneMonth = tasks.filter((t) => t.done && t.doneAt && t.doneAt.slice(0, 7) === today.slice(0, 7)).length;
+  const focusMonth = monthDays.reduce((n, d) => n + (ix.entriesByDate.get(d) ?? []).filter((e) => e.source === "focus").reduce((m, e) => m + entryMins(e), 0), 0);
+  const wastedMonth = monthDays.reduce((n, d) => n + wastedMinsOn(d, ix), 0);
   const journal = ix.journal.get(today);
-  const wastedToday = wastedMinsOn(today, ix);
 
   const tagUse = new Map<string, number>();
   for (const e of Object.values(data.entries)) if (!e.del) tagUse.set(e.tagId, (tagUse.get(e.tagId) ?? 0) + 1);
@@ -102,27 +104,28 @@ export default function Today({ go }: { go: Go }) {
             ))}
           </div>
         )}
+        <div className="month-label row between">
+          <span>{fmtDay(today, { month: "long" })} · this month</span>
+          <span className="muted tiny">resets on the 1st</span>
+        </div>
         <div className="hero-stats">
           <div>
-            <b>
-              {doneCount}/{habitsToday.length}
-            </b>
-            <span>habits</span>
+            <b>{daysLeftInMonth}</b>
+            <span>days left in {fmtDay(today, { month: "short" })}</span>
           </div>
           <div className="said-no-stat">
-            <b>{fmtHM(wastedToday)}</b>
+            <b>{fmtHM(wastedMonth)}</b>
             <span>Wasted Time</span>
           </div>
           <div>
-            <b>{tasksDoneToday}</b>
+            <b>{tasksDoneMonth}</b>
             <span>tasks done</span>
           </div>
           <div>
-            <b>{fmtHM(focusToday)}</b>
-            <span>focus</span>
+            <b>{fmtHM(focusMonth)}</b>
+            <span>focus work</span>
           </div>
         </div>
-        <PillarsBar />
       </section>
 
     ),
@@ -284,7 +287,11 @@ export default function Today({ go }: { go: Go }) {
               </a>
             )}
           </p>
+          <div className="head-pillars">
+            <PillarsBar />
+          </div>
         </div>
+        <MissionBadge />
         <button className="dash-gear" title="Customize dashboard" aria-label="Customize dashboard" onClick={() => setShowCustomize(true)}>
           ⚙
         </button>

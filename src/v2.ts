@@ -308,3 +308,30 @@ export function questMoney(d: Data, pick: "all" | "none" | string[] | undefined,
   });
   return { total: parts.reduce((n, p) => n + p.amount, 0), parts };
 }
+
+// ---------- Life in weeks ----------
+
+export const birthOf = (p: Prefs) => p.birthDate || "2000-01-01";
+export const missionYearsOf = (p: Prefs) => p.missionYears || 30;
+const addYears = (d: string, n: number) => `${Number(d.slice(0, 4)) + n}${d.slice(4)}`;
+const daysFrom = (a: string, b: string) => Math.round((Date.parse(b + "T12:00:00") - Date.parse(a + "T12:00:00")) / 864e5);
+
+/** Every past week counts as crossed (✕) automatically. */
+export function lifeWeeks(p: Prefs, today = todayStr()) {
+  const birth = birthOf(p);
+  const years = missionYearsOf(p);
+  const end = addYears(birth, years);
+  const total = Math.floor(daysFrom(birth, end) / 7);
+  const lived = Math.max(0, Math.min(total, Math.floor(daysFrom(birth, today) / 7)));
+  const left = Math.max(0, total - lived - 1);
+  // Grid: one row per year of age, 52 boxes, each anchored to that birthday (no drift over the years).
+  const rows = Array.from({ length: years }, (_, r) => {
+    const yStart = addYears(birth, r);
+    return Array.from({ length: 52 }, (_, c) => {
+      const from = addDays(yStart, c * 7);
+      const to = c === 51 ? addDays(addYears(birth, r + 1), -1) : addDays(from, 6);
+      return today > to ? "past" : today >= from ? "now" : "future";
+    });
+  });
+  return { birth, end, years, total, lived, left, rows };
+}

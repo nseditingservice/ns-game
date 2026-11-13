@@ -2,7 +2,7 @@ import { useState } from "react";
 import { uid, useList, useStore } from "../store";
 import type { Battle, Urge } from "../types";
 import { fmtDay, fmtHours, todayStr } from "../dates";
-import { Modal } from "../ui";
+import { Modal, lastEmoji } from "../ui";
 import { battleStats } from "../v2";
 import { UrgeModal } from "../components/MindCheck";
 
@@ -211,7 +211,7 @@ function BattleEditor({ battle, onClose }: { battle: Battle; onClose: () => void
   return (
     <Modal title={isNew ? "New battle" : "Edit battle"} onClose={onClose}>
       <div className="row">
-        <input className="emoji-input" value={b.emoji} onChange={(e) => setB({ ...b, emoji: e.target.value.slice(0, 4) })} />
+        <input className="emoji-input" value={b.emoji} onChange={(e) => setB({ ...b, emoji: lastEmoji(e.target.value) })} />
         <input className="grow" autoFocus placeholder="Bad habit, e.g. Checking ex's Instagram" value={b.name} onChange={(e) => setB({ ...b, name: e.target.value })} />
       </div>
       <label>

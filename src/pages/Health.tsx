@@ -2,7 +2,7 @@ import { useState } from "react";
 import { PALETTE, uid, useList, useStore } from "../store";
 import type { Exercise, HealthDay, Meal, MealQuality, Workout, WorkoutType } from "../types";
 import { addDays, dateRange, fmtDay, fmtTime, nowMins, parseTime, todayStr } from "../dates";
-import { celebrate, Empty, Modal, Rating } from "../ui";
+import { celebrate, Empty, Modal, Rating, lastEmoji } from "../ui";
 import { waterMl } from "../water";
 import { foodsOf, proteinOn, proteinTargetOf } from "../v2";
 import { HealthTrends } from "../components/HealthTrends";
@@ -284,7 +284,7 @@ function WorkoutEditor({ w: initial, onClose }: { w: Workout; onClose: () => voi
           {newTag === "__new" && (
             <label className="row">
               Emoji
-              <input className="emoji-input" value={newEmoji} onChange={(e) => setNewEmoji(e.target.value.slice(0, 4))} />
+              <input className="emoji-input" value={newEmoji} onChange={(e) => setNewEmoji(lastEmoji(e.target.value))} />
             </label>
           )}
           <div className="row">
