@@ -15,17 +15,58 @@ export const AUTOMATIC_DAYS = 66;
 export const doneDays = (h: Habit, ix: Index, today = todayStr()) => dateRange(h.createdAt, today).filter((d) => habitStatus(h, d, ix, today) === "done").length;
 
 const DAY_NAMES = ["M", "T", "W", "T", "F", "S", "S"];
+const fmtMins = (m: number) => (m >= 60 ? `${Math.floor(m / 60)}h${m % 60 ? ` ${m % 60}m` : ""}` : `${m}m`);
+
+/** Read "4hr", "4h", "90 min", "30m" from a habit name. */
+function minsInName(name: string): number | null {
+  const h = name.match(/(\d+(?:\.\d+)?)\s*(?:h|hr|hrs|hour|hours)\b/i);
+  if (h) return Math.round(Number(h[1]) * 60);
+  const m = name.match(/(\d+)\s*(?:m|min|mins|minutes)\b/i);
+  return m ? Number(m[1]) : null;
+}
+
+/** Best guess for how a manual habit could tick itself from your calendar. */
+export function guessLink(h: Habit, tags: { id: string; name: string; wasted?: boolean; archived: boolean }[], things: string[]): HabitLink | null {
+  const n = h.name.toLowerCase();
+  const mins = minsInName(h.name);
+  const live = tags.filter((t) => !t.archived && !t.wasted);
+  const tagLike = (re: RegExp) => live.filter((t) => re.test(t.name)).map((t) => t.id);
+  if (/deep\s*work|focus/.test(n)) return { kind: "focus", minMins: mins ?? 120, tagIds: tagLike(/deep\s*work|focus/i) };
+  if (/work\s*out|gym|exercise|train|muay|boxing|lift|fitness/.test(n)) return { kind: "workout" };
+  if (/water|hydrat/.test(n)) return { kind: "water", min: 12, liters: 3 };
+  if (/sleep|bed\s*time/.test(n)) return { kind: "sleep", minHours: 7 };
+  if (/weigh/.test(n)) return { kind: "weight" };
+  if (/eat|diet|healthy\s*food|clean\s*food|meal/.test(n)) return { kind: "healthyMeals", min: 2 };
+  if (/social|phone|scroll|waste|said\s*no/.test(n)) return { kind: "wasteLimit", maxMins: mins ?? 60 };
+  if (/read/.test(n)) {
+    const ids = tagLike(/read|book/i);
+    if (ids.length) return { kind: "tag", tagId: ids[0], tagIds: ids.slice(1), minMins: mins ?? 15 };
+  }
+  if (/meditat|pray/.test(n)) {
+    const ids = tagLike(/meditat|pray/i);
+    if (ids.length) return { kind: "tag", tagId: ids[0], tagIds: ids.slice(1), minMins: mins ?? 10 };
+  }
+  // Anything else: a tag or Thing with a matching word (e.g. "Marketing Business" → Marketing).
+  const words = n.split(/[^a-z0-9]+/).filter((w) => w.length >= 4 && !/^(daily|every|minutes?|hours?)$/.test(w));
+  const hit = (s: string) => words.some((w) => s.toLowerCase().includes(w));
+  const ids = live.filter((t) => hit(t.name)).map((t) => t.id);
+  const th = things.filter(hit);
+  if (ids.length || th.length) return { kind: "tag", tagId: ids[0] ?? "", tagIds: ids.slice(1), things: th, minMins: mins ?? 30 };
+  return null;
+}
 
 const linkLabel = (l: HabitLink, tagName: (id: string) => string) => {
   switch (l.kind) {
     case "manual":
       return "Tick it yourself";
-    case "tag":
-      return `Auto: ${l.minMins}+ min of ${tagName(l.tagId)} logged`;
+    case "tag": {
+      const names = [...new Set([l.tagId, ...(l.tagIds ?? [])].filter(Boolean))].map(tagName);
+      return `Auto: ${fmtMins(l.minMins)}+ of ${[...names, ...(l.things ?? [])].join(" / ") || "?"} in your calendar`;
+    }
     case "focus":
-      return `Auto: ${l.minMins}+ min of focus sessions`;
+      return `Auto: ${fmtMins(l.minMins)}+ of focus${l.tagIds?.length || l.things?.length ? ` + ${[...(l.tagIds ?? []).map(tagName), ...(l.things ?? [])].join(" / ")}` : ""}`;
     case "workout":
-      return "Auto: a workout logged";
+      return "Auto: a workout logged, or workout time in your calendar";
     case "meals":
       return `Auto: ${l.min}+ meals logged`;
     case "healthyMeals":
@@ -165,6 +206,8 @@ export default function Habits() {
           </div>
         </section>
       )}
+
+      <AutoConnect habits={active} tagName={tagName} />
 
       {shown.length > 0 && (
         <section className="card">
@@ -312,6 +355,11 @@ function HabitEditor({ habit, onClose }: { habit: Habit; onClose: () => void }) 
   const isNew = !data.habits[habit.id] || data.habits[habit.id].del;
   const l = h.link;
   const setLink = (link: HabitLink) => setH({ ...h, link });
+  const allTags = useList("tags");
+  const entryList = useList("entries");
+  const thingNames = [...new Set(entryList.map((e) => e.project?.trim()).filter((x): x is string => !!x))];
+  const suggested = h.name.trim().length >= 3 ? guessLink(h, allTags, thingNames) : null;
+  const tagNameOf = (id: string) => allTags.find((t) => t.id === id)?.name ?? "tag";
   const num = (v: string, d: number) => (Number.isFinite(Number(v)) && v !== "" ? Number(v) : d);
 
   return (
@@ -348,6 +396,16 @@ function HabitEditor({ habit, onClose }: { habit: Habit; onClose: () => void }) 
           </button>
         </div>
       </label>
+      {l.kind === "manual" && suggested && (
+        <div className="link-suggest">
+          <span className="small">
+            💡 This can tick itself: <b>{linkLabel(suggested, tagNameOf)}</b>
+          </span>
+          <button type="button" className="btn small primary" onClick={() => setLink(suggested)}>
+            Use it
+          </button>
+        </div>
+      )}
       <div className="row wrap">
         <label className="grow">
           How is it completed?
@@ -371,9 +429,9 @@ function HabitEditor({ habit, onClose }: { habit: Habit; onClose: () => void }) 
             }}
           >
             <option value="manual">I tick it myself</option>
-            <option value="tag">Auto: time logged on a tag</option>
-            <option value="focus">Auto: focus session minutes</option>
-            <option value="workout">Auto: a workout logged</option>
+            <option value="tag">Auto: time in my calendar (tags / Things)</option>
+            <option value="focus">Auto: focus / deep work time</option>
+            <option value="workout">Auto: a workout (logged or in calendar)</option>
             <option value="meals">Auto: number of meals logged</option>
             <option value="healthyMeals">Auto: number of healthy meals</option>
             <option value="water">Auto: litres of water</option>
@@ -382,28 +440,11 @@ function HabitEditor({ habit, onClose }: { habit: Habit; onClose: () => void }) 
             <option value="wasteLimit">Auto: wasted time under a limit</option>
           </select>
         </label>
-        {l.kind === "tag" && (
-          <>
-            <label>
-              Tag
-              <select value={l.tagId} onChange={(e) => setLink({ ...l, tagId: e.target.value })}>
-                {tags.map((t) => (
-                  <option key={t.id} value={t.id}>
-                    {t.emoji} {t.name}
-                  </option>
-                ))}
-              </select>
-            </label>
-            <label>
-              Min. minutes
-              <input type="number" min={1} value={l.minMins} onChange={(e) => setLink({ ...l, minMins: num(e.target.value, 1) })} />
-            </label>
-          </>
-        )}
-        {l.kind === "focus" && (
+        {(l.kind === "tag" || l.kind === "focus") && (
           <label>
-            Min. minutes
-            <input type="number" min={1} value={l.minMins} onChange={(e) => setLink({ ...l, minMins: num(e.target.value, 1) })} />
+            Min. time (minutes)
+            <input type="number" min={1} value={l.minMins} onChange={(e) => setLink({ ...l, minMins: num(e.target.value, 1) })} style={{ width: 110 }} />
+            <span className="muted tiny">{fmtMins(l.minMins)}</span>
           </label>
         )}
         {l.kind === "wasteLimit" && (
@@ -431,6 +472,14 @@ function HabitEditor({ habit, onClose }: { habit: Habit; onClose: () => void }) 
           </label>
         )}
       </div>
+      {(l.kind === "tag" || l.kind === "focus") && (
+        <LinkSources
+          tagIds={l.kind === "tag" ? [l.tagId, ...(l.tagIds ?? [])].filter(Boolean) : (l.tagIds ?? [])}
+          things={l.things ?? []}
+          intro={l.kind === "focus" ? "Focus sessions always count. Also count calendar time on:" : "Count calendar time on any of these:"}
+          onChange={(ids, th) => setLink(l.kind === "tag" ? { ...l, tagId: ids[0] ?? "", tagIds: ids.slice(1), things: th } : { ...l, tagIds: ids, things: th })}
+        />
+      )}
       <label>
         Life area
         <AreaSelect value={h.area} onChange={(area) => setH({ ...h, area })} />
@@ -453,5 +502,88 @@ function HabitEditor({ habit, onClose }: { habit: Habit; onClose: () => void }) 
         )}
       </div>
     </Modal>
+  );
+}
+
+/** Suggests calendar links for any habit you still tick by hand. Folded away until you open it. */
+function AutoConnect({ habits, tagName }: { habits: Habit[]; tagName: (id: string) => string }) {
+  const { putMany } = useStore();
+  const tags = useList("tags");
+  const entries = useList("entries");
+  const things = [...new Set(entries.map((e) => e.project?.trim()).filter((x): x is string => !!x))];
+  const [open, setOpen] = useState(() => localStorage.getItem("nsgame:autoconnect-open") === "1");
+  const sugg = habits.filter((h) => h.link.kind === "manual").map((h) => ({ h, link: guessLink(h, tags, things) })).filter((x): x is { h: Habit; link: HabitLink } => !!x.link);
+  if (!sugg.length) return null;
+  const toggle = () => {
+    localStorage.setItem("nsgame:autoconnect-open", open ? "0" : "1");
+    setOpen(!open);
+  };
+  const connect = (list: typeof sugg) => putMany("habits", list.map(({ h, link }) => ({ ...h, link })));
+  return (
+    <section className={`auto-connect ${open ? "open" : ""}`}>
+      <button className="auto-connect-bar" onClick={toggle} aria-expanded={open}>
+        <span>
+          🔗 {sugg.length} habit{sugg.length === 1 ? "" : "s"} can tick {sugg.length === 1 ? "itself" : "themselves"} from your calendar
+        </span>
+        <span className="muted">{open ? "▴ hide" : "▾ show"}</span>
+      </button>
+      {open && (
+        <div className="auto-connect-body">
+          {sugg.map(({ h, link }) => (
+            <div key={h.id} className="row between auto-row">
+              <span>
+                {h.emoji} <b>{h.name}</b> <span className="muted small">→ {linkLabel(link, tagName)}</span>
+              </span>
+              <button className="btn small" onClick={() => connect([{ h, link }])}>
+                Connect
+              </button>
+            </div>
+          ))}
+          <div className="row between wrap">
+            {sugg.length > 1 ? (
+              <button className="btn primary small" onClick={() => connect(sugg)}>
+                Connect all {sugg.length}
+              </button>
+            ) : (
+              <span />
+            )}
+            <span className="muted tiny">Change any link later: tap the habit → Edit → "How is it completed?"</span>
+          </div>
+        </div>
+      )}
+    </section>
+  );
+}
+
+/** Pick which tags and Things feed an auto habit. */
+function LinkSources({ tagIds, things, intro, onChange }: { tagIds: string[]; things: string[]; intro: string; onChange: (tagIds: string[], things: string[]) => void }) {
+  const tags = useList("tags").filter((t) => !t.archived);
+  const entries = useList("entries");
+  const allThings = [...new Set([...things, ...entries.map((e) => e.project?.trim()).filter((x): x is string => !!x)])].slice(0, 30);
+  return (
+    <div className="link-sources">
+      <div className="muted small">{intro}</div>
+      <div className="chip-row">
+        {tags.map((t) => (
+          <button key={t.id} type="button" className={`mini-chip ${tagIds.includes(t.id) ? "on" : ""}`} onClick={() => onChange(tagIds.includes(t.id) ? tagIds.filter((x) => x !== t.id) : [...tagIds, t.id], things)}>
+            {tagIds.includes(t.id) ? "✓ " : ""}
+            {t.emoji} {t.name}
+          </button>
+        ))}
+      </div>
+      {allThings.length > 0 && (
+        <>
+          <div className="muted small" style={{ marginTop: 6 }}>…or Things / projects:</div>
+          <div className="chip-row">
+            {allThings.map((p) => (
+              <button key={p} type="button" className={`mini-chip ${things.includes(p) ? "on" : ""}`} onClick={() => onChange(tagIds, things.includes(p) ? things.filter((x) => x !== p) : [...things, p])}>
+                {things.includes(p) ? "✓ " : ""}
+                {p}
+              </button>
+            ))}
+          </div>
+        </>
+      )}
+    </div>
   );
 }

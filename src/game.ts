@@ -20,6 +20,7 @@ export interface Index {
   journal: Map<string, Journal>;
   urgesByDate: Map<string, Urge[]>;
   penalty: number;
+  workoutTags: Set<string>;
 }
 
 function group<T extends { date: string }>(items: T[]): Map<string, T[]> {
@@ -45,7 +46,19 @@ export function buildIndex(d: Data): Index {
     journal: new Map(alive(d.journal ?? {}).map((j) => [j.date, j])),
     urgesByDate: group(alive(d.urges ?? {})),
     penalty: penaltyOf((d.meta.prefs ?? {}) as Prefs),
+    workoutTags: workoutTagIds(d),
   };
+}
+
+const WORKOUT_NAME = /workout|gym|muay|thai|box|bag|train|run|yoga|hiit|sport|swim|cycl|lift|calisthen|cardio|fight|martial/i;
+/** Tags that count as a workout: your workout types, the default workout tag, and tags named like a workout. */
+export function workoutTagIds(d: Data) {
+  const prefs = (d.meta.prefs ?? {}) as Prefs;
+  const ids = new Set<string>();
+  if (prefs.workoutTagId) ids.add(prefs.workoutTagId);
+  for (const t of prefs.workoutTypes ?? []) if (t.tagId) ids.add(t.tagId);
+  for (const t of alive(d.tags)) if (WORKOUT_NAME.test(t.name) && !t.wasted) ids.add(t.id);
+  return ids;
 }
 
 export function useIndex(): Index {
@@ -54,6 +67,13 @@ export function useIndex(): Index {
 }
 
 export const entryMins = (e: Entry) => Math.max(0, e.end - e.start);
+
+const thingKeyOf = (s: string) => s.trim().toLowerCase();
+/** Does a time entry count for a habit linked to these tags / Things? */
+export function matchesLink(e: Entry, tagIds: string[], things?: string[]) {
+  if (tagIds.includes(e.tagId)) return true;
+  return !!(e.project && things?.length && things.some((t) => thingKeyOf(t) === thingKeyOf(e.project!)));
+}
 
 /** "I could have said NO": the entry's own flag wins, otherwise its tag decides. */
 export const isWasted = (e: Entry, tags: Map<string, Tag>) => e.wasted ?? tags.get(e.tagId)?.wasted ?? false;
@@ -75,11 +95,14 @@ export function autoProgress(h: Habit, date: string, ix: Index): { value: number
     case "manual":
       return null;
     case "tag":
-      return { value: entries.filter((e) => e.tagId === l.tagId).reduce((n, e) => n + entryMins(e), 0), target: l.minMins, unit: "min" };
+      // Time from your calendar / timer on any of the chosen tags or Things.
+      return { value: entries.filter((e) => matchesLink(e, [l.tagId, ...(l.tagIds ?? [])], l.things)).reduce((n, e) => n + entryMins(e), 0), target: l.minMins, unit: "min" };
     case "focus":
-      return { value: entries.filter((e) => e.source === "focus").reduce((n, e) => n + entryMins(e), 0), target: l.minMins, unit: "min" };
+      // Focus sessions, plus calendar time on the chosen tags / Things (each entry counted once).
+      return { value: entries.filter((e) => e.source === "focus" || matchesLink(e, l.tagIds ?? [], l.things)).reduce((n, e) => n + entryMins(e), 0), target: l.minMins, unit: "min" };
     case "workout":
-      return { value: (ix.workoutsByDate.get(date) ?? []).length, target: 1, unit: "workout" };
+      // A logged workout, or time on any workout tag in your calendar.
+      return { value: (ix.workoutsByDate.get(date) ?? []).length || (entries.some((e) => ix.workoutTags.has(e.tagId) && entryMins(e) >= 10) ? 1 : 0), target: 1, unit: "workout" };
     case "meals":
       return { value: meals.length, target: l.min, unit: "meals" };
     case "healthyMeals":

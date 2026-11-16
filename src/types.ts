@@ -197,13 +197,13 @@ export interface Entry extends Rec {
 
 export type HabitLink =
   | { kind: "manual" }
-  | { kind: "tag"; tagId: string; minMins: number }
+  | { kind: "tag"; tagId: string; minMins: number; tagIds?: string[]; things?: string[] }
   | { kind: "workout" }
   | { kind: "meals"; min: number }
   | { kind: "healthyMeals"; min: number }
   | { kind: "water"; min: number; liters?: number } // liters; old habits used glasses in `min`
   | { kind: "sleep"; minHours: number }
-  | { kind: "focus"; minMins: number }
+  | { kind: "focus"; minMins: number; tagIds?: string[]; things?: string[] }
   | { kind: "weight" }
   | { kind: "wasteLimit"; maxMins: number };
 
