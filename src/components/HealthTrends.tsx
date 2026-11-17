@@ -1,5 +1,8 @@
 import { useList, useStore } from "../store";
-import type { MealQuality } from "../types";
+import { useMemo, useState } from "react";
+import type { MealQuality, Workout } from "../types";
+import { entryMins, workoutTagIds } from "../game";
+import { fmtTime } from "../dates";
 import { addDays, dateRange, fmtDay, todayStr, weekStart } from "../dates";
 import { waterMl } from "../water";
 import { proteinOn, proteinTargetOf } from "../v2";
@@ -50,11 +53,10 @@ function Trend({ icon, title, big, sub, children }: { icon: string; title: strin
   );
 }
 
-export function HealthTrends() {
+export function HealthTrends({ onEditWorkout }: { onEditWorkout?: (w: Workout) => void }) {
   const { prefs } = useStore();
   const healthDays = useList("healthDays");
   const meals = useList("meals");
-  const workouts = useList("workouts");
   const today = todayStr();
   const hmap = new Map(healthDays.map((h) => [h.date, h]));
   const days14 = dateRange(addDays(today, -13), today);
@@ -87,11 +89,6 @@ export function HealthTrends() {
   const prot7 = days7.map((d) => proteinOn(d, meals));
 
   // Workouts
-  const wDays = new Set(workouts.map((w) => w.date));
-  const gridStart = addDays(weekStart(today), -21);
-  const grid = dateRange(gridStart, addDays(weekStart(today), 6));
-  const thisWeek = workouts.filter((w) => w.date >= weekStart(today)).length;
-  const thisYear = workouts.filter((w) => w.date >= `${today.slice(0, 4)}-01-01`).length;
 
   // Eating
   const recent = meals.filter((m) => m.date >= days7[0]);
@@ -117,20 +114,7 @@ export function HealthTrends() {
           <GoalBars days={days14} values={prot14} goal={pGoal} unit="g" color="#f59e0b" />
         </Trend>
 
-        <Trend icon="🏋️" title="Workouts" big={`${thisWeek} this week`} sub={`${thisYear} workouts this year · green = a day you trained`}>
-          <div className="workout-grid">
-            {["M", "T", "W", "T", "F", "S", "S"].map((d, i) => (
-              <span key={i} className="muted tiny wg-head">
-                {d}
-              </span>
-            ))}
-            {grid.map((d) => (
-              <span key={d} className={`wg-day ${wDays.has(d) ? "on" : ""} ${d > today ? "future" : ""} ${d === today ? "is-today" : ""}`} title={d}>
-                {wDays.has(d) ? "✓" : ""}
-              </span>
-            ))}
-          </div>
-        </Trend>
+        <WorkoutTrend onEdit={onEditWorkout} />
 
         <Trend icon="🍽️" title="Eating" big={recent.length ? `${Math.round((q("great") / recent.length) * 100)}% healthy` : "–"} sub={recent.length ? `last 7 days · 🟢 ${q("great")} healthy · 🟡 ${q("ok")} okay · 🔴 ${q("junk")} junk` : "No meals logged this week."}>
           {recent.length > 0 && (
@@ -180,5 +164,134 @@ function WeightLine({ points }: { points: { d: string; v: number }[] }) {
         <span>{fmtDay(points[points.length - 1].d, { day: "numeric", month: "short" })}</span>
       </div>
     </div>
+  );
+}
+
+interface WorkoutItem {
+  key: string;
+  date: string;
+  start: number | null;
+  mins: number;
+  title: string;
+  emoji: string;
+  intensity: number | null;
+  details: string;
+  notes: string;
+  workout?: Workout;
+}
+
+const INTENSITY = ["", "Easy", "Moderate", "Hard"];
+const PAGE = 10;
+
+/** Workouts: tick grid + a fold-out list of what you trained, day by day. */
+function WorkoutTrend({ onEdit }: { onEdit?: (w: Workout) => void }) {
+  const { data, prefs } = useStore();
+  const workouts = useList("workouts");
+  const entries = useList("entries");
+  const [open, setOpen] = useState(false);
+  const [shown, setShown] = useState(PAGE);
+  const [sel, setSel] = useState<string | null>(null);
+  const today = todayStr();
+
+  const items = useMemo(() => {
+    const tagOf = (id: string | null | undefined) => (id && data.tags[id] && !data.tags[id].del ? data.tags[id] : null);
+    const typeTag = (type: string) => tagOf((prefs.workoutTypes ?? []).find((t) => t.name === type)?.tagId ?? prefs.workoutTagId);
+    const list: WorkoutItem[] = workouts.map((w) => ({
+      key: w.id,
+      date: w.date,
+      start: w.start,
+      mins: w.durationMins,
+      title: w.type,
+      emoji: typeTag(w.type)?.emoji ?? "🏋️",
+      intensity: w.intensity,
+      details: w.exercises.filter((x) => x.name.trim()).map((x) => `${x.name.trim()} ${x.sets} × ${x.reps}${x.weight ? ` @ ${x.weight} kg` : ""}`).join(" · "),
+      notes: w.notes,
+      workout: w,
+    }));
+    // Workout time logged straight in the calendar (no workout record) counts too.
+    const wTags = workoutTagIds(data);
+    for (const e of entries) {
+      if (e.workoutId || !wTags.has(e.tagId) || entryMins(e) < 10) continue;
+      const t = tagOf(e.tagId);
+      list.push({ key: e.id, date: e.date, start: e.start, mins: entryMins(e), title: t?.name ?? "Workout", emoji: t?.emoji ?? "🏋️", intensity: null, details: "", notes: e.note, workout: undefined });
+    }
+    return list.sort((a, b) => b.date.localeCompare(a.date) || (b.start ?? 0) - (a.start ?? 0));
+  }, [workouts, entries, data, prefs]);
+
+  const days = new Set(items.map((i) => i.date));
+  const wk = weekStart(today);
+  const grid = dateRange(addDays(wk, -21), addDays(wk, 6));
+  const thisWeek = items.filter((i) => i.date >= wk).length;
+  const thisYear = items.filter((i) => i.date >= `${today.slice(0, 4)}-01-01`).length;
+  const weekLabel = (d: string) => {
+    const w = weekStart(d);
+    return w === wk ? "This week" : w === addDays(wk, -7) ? "Last week" : `Week of ${fmtDay(w, { day: "numeric", month: "short" })}`;
+  };
+
+  const pickDay = (d: string) => {
+    if (!days.has(d)) return;
+    setSel(d);
+    setOpen(true);
+    const idx = items.findIndex((i) => i.date === d);
+    if (idx >= shown) setShown(idx + PAGE);
+    setTimeout(() => document.getElementById(`wk-${d}`)?.scrollIntoView({ behavior: "smooth", block: "center" }), 60);
+  };
+
+  const visible = items.slice(0, shown);
+  return (
+    <Trend icon="🏋️" title="Workouts" big={`${thisWeek} this week`} sub={`${thisYear} workouts this year · green = a day you trained · tap one to see it`}>
+      <div className="workout-grid">
+        {["M", "T", "W", "T", "F", "S", "S"].map((d, i) => (
+          <span key={i} className="muted tiny wg-head">
+            {d}
+          </span>
+        ))}
+        {grid.map((d) => (
+          <button key={d} className={`wg-day ${days.has(d) ? "on" : ""} ${d > today ? "future" : ""} ${d === today ? "is-today" : ""} ${sel === d ? "sel" : ""}`} title={fmtDay(d)} onClick={() => pickDay(d)} disabled={!days.has(d)}>
+            {days.has(d) ? "✓" : ""}
+          </button>
+        ))}
+      </div>
+      {items.length > 0 && (
+        <button className="wl-toggle" onClick={() => setOpen(!open)} aria-expanded={open}>
+          <span>
+            📋 <b>What did I train?</b> <span className="muted">· {items.length} logged</span>
+          </span>
+          <span className="muted">{open ? "▴ hide" : "▾ show"}</span>
+        </button>
+      )}
+      {open && (
+        <div className="wl-list">
+          {visible.map((it, i) => (
+            <div key={it.key}>
+              {(i === 0 || weekStart(visible[i - 1].date) !== weekStart(it.date)) && <div className="wl-week">{weekLabel(it.date)}</div>}
+              <div
+                id={visible.findIndex((x) => x.date === it.date) === i ? `wk-${it.date}` : undefined}
+                className={`wl-item ${sel === it.date ? "hl" : ""} ${it.workout && onEdit ? "clickable" : ""}`}
+                onClick={() => it.workout && onEdit?.(it.workout)}
+              >
+                <div className="row between">
+                  <b>
+                    {fmtDay(it.date, { weekday: "short", day: "numeric", month: "short" })} · {it.emoji} {it.title}
+                  </b>
+                  {it.intensity ? <span className={`chip int-${it.intensity}`}>{INTENSITY[it.intensity]}</span> : <span className="muted tiny">📅 from calendar</span>}
+                </div>
+                <div className="muted small">
+                  {it.start != null ? `${fmtTime(it.start)} · ` : ""}
+                  {it.mins} min
+                </div>
+                {it.details && <div className="wl-ex">{it.details}</div>}
+                {it.notes && <div className="wl-ex">📝 {it.notes}</div>}
+              </div>
+            </div>
+          ))}
+          {items.length > shown && (
+            <button className="btn ghost small wl-more" onClick={() => setShown(shown + PAGE)}>
+              Show older workouts ▾
+            </button>
+          )}
+        </div>
+      )}
+    </Trend>
   );
 }

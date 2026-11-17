@@ -186,7 +186,7 @@ export default function Health() {
         </div>
       </section>
 
-      <HealthTrends />
+      <HealthTrends onEditWorkout={setEditingWorkout} />
 
       {editingWorkout && <WorkoutEditor w={editingWorkout} onClose={() => setEditingWorkout(null)} />}
       {editingMeal && <MealEditor meal={editingMeal} onClose={() => setEditingMeal(null)} />}
