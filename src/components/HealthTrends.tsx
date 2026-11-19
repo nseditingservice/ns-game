@@ -278,7 +278,7 @@ function WorkoutTrend({ onEdit }: { onEdit?: (w: Workout) => void }) {
                 </div>
                 <div className="muted small">
                   {it.start != null ? `${fmtTime(it.start)} · ` : ""}
-                  {it.mins} min
+                  {it.mins ? `${it.mins} min` : ""}
                 </div>
                 {it.details && <div className="wl-ex">{it.details}</div>}
                 {it.notes && <div className="wl-ex">📝 {it.notes}</div>}

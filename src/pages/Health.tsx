@@ -121,7 +121,7 @@ export default function Health() {
       <section className="card">
         <div className="card-head">
           <h2>🏋️ Workouts</h2>
-          <button className="btn primary small" onClick={() => setEditingWorkout({ id: uid(), u: 0, date, type: "Strength", start: date === today ? Math.max(0, nowMins() - 60) : 18 * 60, durationMins: 45, intensity: 2, exercises: [], notes: "" })}>
+          <button className="btn primary small" onClick={() => setEditingWorkout({ id: uid(), u: 0, date, type: "Strength", start: null, durationMins: 0, intensity: 2, exercises: [], notes: "" })}>
             + Log workout
           </button>
         </div>
@@ -131,7 +131,8 @@ export default function Health() {
             <li key={w.id} className="workout-row" onClick={() => setEditingWorkout(w)}>
               <div className="row between">
                 <b>
-                  {w.type} · {w.durationMins} min
+                  {w.type}
+                  {w.durationMins ? ` · ${w.durationMins} min` : ""}
                 </b>
                 <span className="muted small">
                   {["", "Easy", "Moderate", "Hard"][w.intensity]}
@@ -212,17 +213,12 @@ function WorkoutEditor({ w: initial, onClose }: { w: Workout; onClose: () => voi
   const setEx = (i: number, patch: Partial<Exercise>) => setW({ ...w, exercises: w.exercises.map((x, j) => (j === i ? { ...x, ...patch } : x)) });
   const liveTag = (id: string | null | undefined) => (id && data.tags[id] && !data.tags[id].del ? id : null);
   const defaultTag = liveTag(prefs.workoutTagId);
-  const tagFor = (typeName: string) => liveTag(types.find((t) => t.name === typeName)?.tagId) ?? defaultTag;
   const tagLabel = (id: string | null) => (id ? `${data.tags[id]?.emoji ?? ""} ${data.tags[id]?.name ?? "?"}` : "no tag");
 
   const save = () => {
+    // Only records WHAT you did. Time comes from your timer / calendar, so nothing is added there.
+    // (Calendar entries made by older workouts are left untouched.)
     put("workouts", w);
-    // Also show the workout on the calendar / in Things I Did, under this type's tag.
-    const tagId = tagFor(w.type);
-    const existing = Object.values(data.entries).find((e) => e.workoutId === w.id && !e.del);
-    if (tagId && w.start != null) {
-      put("entries", { id: existing?.id ?? uid(), tagId, date: w.date, start: w.start, end: Math.min(w.start + w.durationMins, 24 * 60), note: w.type, taskId: null, source: "workout", workoutId: w.id });
-    } else if (existing) del("entries", existing.id);
     if (isNew) celebrate("Workout logged +25 XP", "🏋️");
     onClose();
   };
@@ -258,7 +254,7 @@ function WorkoutEditor({ w: initial, onClose }: { w: Workout; onClose: () => voi
         </button>
       </div>
       <div className="muted tiny">
-        Time goes to {tagLabel(tagFor(w.type))} in Things I Did{w.start == null ? " (set a start time to log it)" : ""} ·{" "}
+        Your time comes from the timer on the dashboard ·{" "}
         <button style={LINK} onClick={() => setManaging(!managing)}>
           {managing ? "done" : "manage types"}
         </button>
@@ -333,14 +329,6 @@ function WorkoutEditor({ w: initial, onClose }: { w: Workout; onClose: () => voi
         <label>
           Date
           <input type="date" value={w.date} onChange={(e) => e.target.value && setW({ ...w, date: e.target.value })} />
-        </label>
-        <label>
-          Start
-          <input type="time" value={w.start != null ? fmtTime(w.start) : ""} onChange={(e) => setW({ ...w, start: e.target.value ? parseTime(e.target.value) : null })} />
-        </label>
-        <label>
-          Minutes
-          <input type="number" min={1} value={w.durationMins} onChange={(e) => setW({ ...w, durationMins: Number(e.target.value) || 1 })} style={{ width: 90 }} />
         </label>
       </div>
       <label>
